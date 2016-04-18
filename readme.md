@@ -10,7 +10,7 @@ To build the terrafarm from scratch, make sure you have a working Go 1.5+ worksp
 go get github.com/essentialkaos/terrafarm
 ```
 
-If you want to updated terrafarm to latest stable release, do:
+If you want update terrafarm to latest stable release, do:
 
 ```
 go get -u github.com/essentialkaos/terrafarm
