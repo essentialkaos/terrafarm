@@ -16,6 +16,28 @@ If you want update terrafarm to latest stable release, do:
 go get -u github.com/essentialkaos/terrafarm
 ```
 
+#### Configuration
+
+`terrafarm` use two ways for farm preconfiguration — preferences file and command-line arguments. Preferences file use next format:
+
+```yaml
+prop-name: prop-value
+```
+
+Example:
+
+```yaml
+user: builder
+token: abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234
+key: /home/user/.ssh/terra-farm
+output: /home/user/terrafarm-nodes.list
+region: ams3
+node-size: 8gb
+ttl: 240
+```
+
+Command-line arguments have higher priority and overwrite properties defined in preferences file.
+
 #### Usage
 
 ```
