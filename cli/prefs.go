@@ -1,0 +1,233 @@
+package cli
+
+// ////////////////////////////////////////////////////////////////////////////////// //
+//                                                                                    //
+//                     Copyright (c) 2009-2016 Essential Kaos                         //
+//      Essential Kaos Open Source License <http://essentialkaos.com/ekol?en>         //
+//                                                                                    //
+// ////////////////////////////////////////////////////////////////////////////////// //
+
+import (
+	"io/ioutil"
+	"os"
+	"strconv"
+	"strings"
+
+	"pkg.re/essentialkaos/ek.v1/arg"
+	"pkg.re/essentialkaos/ek.v1/crypto"
+	"pkg.re/essentialkaos/ek.v1/fmtc"
+	"pkg.re/essentialkaos/ek.v1/fsutil"
+)
+
+// ////////////////////////////////////////////////////////////////////////////////// //
+
+type Prefs struct {
+	TTL      int64
+	Output   string
+	Token    string
+	Key      string
+	Region   string
+	NodeSize string
+	User     string
+	Password string
+}
+
+// ////////////////////////////////////////////////////////////////////////////////// //
+
+// findAndReadPrefs read prefs from file and command-line arguments
+func findAndReadPrefs() *Prefs {
+	prefs := &Prefs{
+		TTL:      240,
+		Password: crypto.GenPassword(18, crypto.STRENGTH_MEDIUM),
+	}
+
+	prefsFile := fsutil.ProperPath("FRS", []string{
+		".terrafarm",
+		"~/.terrafarm",
+	})
+
+	if prefsFile != "" {
+		applyPrefsFromFile(prefs, prefsFile)
+	}
+
+	applyPrefsFromArgs(prefs)
+	validatePrefs(prefs)
+
+	return prefs
+}
+
+// applyPrefsFromFile read arguments from file and add it to prefs struct
+func applyPrefsFromFile(prefs *Prefs, file string) {
+	data, err := ioutil.ReadFile(file)
+
+	if err != nil {
+		return
+	}
+
+	for _, prop := range strings.Split(string(data), "\n") {
+		prop = strings.TrimSpace(prop)
+
+		if prop == "" {
+			continue
+		}
+
+		propSlice := strings.Split(prop, ":")
+
+		if len(propSlice) < 2 {
+			continue
+		}
+
+		propName := propSlice[0]
+		propVal := strings.TrimSpace(strings.Join(propSlice[1:], ":"))
+
+		switch strings.ToLower(propName) {
+		case "ttl":
+			prefs.TTL = parseTTL(propVal)
+
+			if prefs.TTL == -1 {
+				fmtc.Printf("{r}Can't parse ttl property in %s file{!}\n", file)
+			}
+
+		case "output":
+			prefs.Output = propVal
+
+		case "token":
+			prefs.Token = propVal
+
+		case "key":
+			prefs.Key = propVal
+
+		case "region":
+			prefs.Region = propVal
+
+		case "node_size", "node-size":
+			prefs.NodeSize = propVal
+
+		case "user":
+			prefs.User = propVal
+
+		default:
+			fmtc.Printf("{y}Unknown property %s in %s file{!}\n", propName, file)
+		}
+	}
+}
+
+// applyPrefsFromArgs add values from command-line arguments to prefs struct
+func applyPrefsFromArgs(prefs *Prefs) {
+	if arg.Has(ARG_TTL) {
+		prefs.TTL = parseTTL(arg.GetS(ARG_TTL))
+
+		if prefs.TTL == -1 {
+			fmtc.Println("{r}Can't parse ttl property from command-line arguments{!}")
+		}
+	}
+
+	if arg.Has(ARG_OUTPUT) {
+		prefs.Output = arg.GetS(ARG_OUTPUT)
+	}
+
+	if arg.Has(ARG_TOKEN) {
+		prefs.Token = arg.GetS(ARG_TOKEN)
+	}
+
+	if arg.Has(ARG_KEY) {
+		prefs.Key = arg.GetS(ARG_KEY)
+	}
+
+	if arg.Has(ARG_REGION) {
+		prefs.Region = arg.GetS(ARG_REGION)
+	}
+
+	if arg.Has(ARG_NODE_SIZE) {
+		prefs.NodeSize = arg.GetS(ARG_NODE_SIZE)
+	}
+
+	if arg.Has(ARG_USER) {
+		prefs.User = arg.GetS(ARG_USER)
+	}
+
+	if arg.Has(ARG_PASSWORD) {
+		prefs.Password = arg.GetS(ARG_PASSWORD)
+	}
+}
+
+// parseTTL parse ttl string and return as minutes
+func parseTTL(ttl string) int64 {
+	var ttlVal int64
+	var mult int64
+	var err error
+
+	switch {
+	case strings.HasSuffix(ttl, "d"):
+		ttlVal, err = strconv.ParseInt(strings.TrimRight(ttl, "d"), 10, 64)
+		mult = 1440
+
+	case strings.HasSuffix(ttl, "h"):
+		ttlVal, err = strconv.ParseInt(strings.TrimRight(ttl, "h"), 10, 64)
+		mult = 60
+
+	case strings.HasSuffix(ttl, "m"):
+		ttlVal, err = strconv.ParseInt(strings.TrimRight(ttl, "m"), 10, 64)
+		mult = 1
+
+	default:
+		ttlVal, err = strconv.ParseInt(ttl, 10, 64)
+		mult = 1
+	}
+
+	if err != nil {
+		return -1
+	}
+
+	return ttlVal * mult
+}
+
+func validatePrefs(prefs *Prefs) {
+	hasErrors := false
+
+	if prefs.Token == "" {
+		fmtc.Println("{r}Property token must be set{!}")
+		hasErrors = true
+	}
+
+	if prefs.Key == "" {
+		fmtc.Println("{r}Property key must be set{!}")
+		hasErrors = true
+	} else {
+		if !fsutil.IsExist(prefs.Key) {
+			fmtc.Printf("{r}Private key file %s does not exits{!}\n", prefs.Key)
+			hasErrors = true
+		}
+
+		if !fsutil.IsReadable(prefs.Key) {
+			fmtc.Printf("{r}Private key file %s must be readable{!}\n", prefs.Key)
+			hasErrors = true
+		}
+
+		if !fsutil.IsNonEmpty(prefs.Key) {
+			fmtc.Printf("{r}Private key file %s does not contain any data{!}\n", prefs.Key)
+			hasErrors = true
+		}
+
+		if !fsutil.IsExist(prefs.Key + ".pub") {
+			fmtc.Printf("{r}Public key file %s.pub does not exits{!}\n", prefs.Key)
+			hasErrors = true
+		}
+
+		if !fsutil.IsReadable(prefs.Key + ".pub") {
+			fmtc.Printf("{r}Public key file %s.pub must be readable{!}\n", prefs.Key)
+			hasErrors = true
+		}
+
+		if !fsutil.IsNonEmpty(prefs.Key + ".pub") {
+			fmtc.Printf("{r}Public key file %s.pub does not contain any data{!}\n", prefs.Key)
+			hasErrors = true
+		}
+	}
+
+	if hasErrors {
+		os.Exit(1)
+	}
+}
+
+// ////////////////////////////////////////////////////////////////////////////////// //
