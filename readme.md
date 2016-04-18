@@ -36,6 +36,8 @@ node-size: 8gb
 ttl: 240
 ```
 
+Preferences file must be named as `.terrafarm` and placed in your `HOME` directory.
+
 Command-line arguments have higher priority and overwrite properties defined in preferences file.
 
 #### Usage
