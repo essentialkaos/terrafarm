@@ -130,6 +130,7 @@ func Init() {
 		return
 	}
 
+	checkEnv()
 	checkDeps()
 
 	if arg.Has(ARG_MONITOR) {
@@ -137,6 +138,21 @@ func Init() {
 	} else {
 		cmd := args[0]
 		processCommand(cmd)
+	}
+}
+
+// checkEnv check system environment
+func checkEnv() {
+	if envMap["GOPATH"] == "" {
+		fmtc.Println("{r}GOPATH must be set to valid path{!}")
+		os.Exit(1)
+	}
+
+	srcDir := getSrcDir()
+
+	if !fsutil.CheckPerms("DRW", srcDir) {
+		fmtc.Printf("{r}Source directory %s is not accessible{!}\n", srcDir)
+		os.Exit(1)
 	}
 }
 
