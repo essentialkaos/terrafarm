@@ -60,6 +60,13 @@ Examples:
 
 ```
 
+#### Build Status
+
+| Repository | Status |
+|------------|--------|
+| Stable | [![Build Status](https://travis-ci.org/essentialkaos/terrafarm.svg?branch=master)](https://travis-ci.org/essentialkaos/terrafarm) |
+| Unstable | [![Build Status](https://travis-ci.org/essentialkaos/terrafarm.svg?branch=develop)](https://travis-ci.org/essentialkaos/terrafarm) |
+
 #### License
 
 [EKOL](https://essentialkaos.com/ekol)
