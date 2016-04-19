@@ -35,7 +35,7 @@ import (
 
 const (
 	APP  = "Terrafarm"
-	VER  = "0.3.0"
+	VER  = "0.3.1"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -177,16 +177,32 @@ func startMonitor() {
 	destroyTime := time.Unix(int64(arg.GetI(ARG_MONITOR)), 0)
 
 	for {
-		time.Sleep(time.Minute)
-
 		if !isTerrafarmActive() {
 			os.Exit(0)
 		}
 
-		if time.Now().Unix() >= destroyTime.Unix() {
-			processCommand(CMD_DESTROY)
-			os.Exit(0)
+		time.Sleep(time.Minute)
+
+		if time.Now().Unix() <= destroyTime.Unix() {
+			continue
 		}
+
+		prefs := findAndReadPrefs()
+		vars, err := prefsToArgs(prefs)
+
+		if err != nil {
+			continue
+		}
+
+		vars = append(vars, "-force")
+
+		err = execTerraformSync("destroy", vars)
+
+		if err != nil {
+			continue
+		}
+
+		os.Exit(0)
 	}
 }
 
@@ -496,6 +512,23 @@ func execTerraform(command string, args []string) error {
 	fsutil.Pop()
 
 	return nil
+}
+
+// execTerraformSync start terrafrom command synchronously
+func execTerraformSync(command string, args []string) error {
+	fsutil.Push(getDataDir())
+
+	cmd := exec.Command("terraform", command)
+
+	if len(args) != 0 {
+		cmd.Args = append(cmd.Args, strings.Split(strings.Join(args, " "), " ")...)
+	}
+
+	err := cmd.Run()
+
+	fsutil.Pop()
+
+	return err
 }
 
 // isTerrafarmActive return true if terrafarm already active
