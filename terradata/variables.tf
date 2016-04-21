@@ -15,9 +15,9 @@ variable token {
 }
 
 variable region {
-  default = "fra1"
+  default = ""
 }
 
 variable node_size {
-  default = "16gb"
+  default = ""
 }

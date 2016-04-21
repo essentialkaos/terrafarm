@@ -49,8 +49,7 @@ Commands:
 
   create      Create and run farm droplets on DigitalOcean
   destroy     Destroy farm droplets on DigitalOcean
-  show        Show info about droplets in farm
-  plan        Show execution plan
+  status      Show current Terrafarm preferencies and status
 
 Options:
 
@@ -61,26 +60,24 @@ Options:
   --region, -R region     DigitalOcean region
   --node-size, -N size    Droplet size on DigitalOcean
   --user, -U username     Build node user name
+  --force, -f             Force command execution
   --no-color, -nc         Disable colors in output
   --help, -h              Show this help message
   --version, -v           Show version
 
 Examples:
 
-  terrafarm plan
-  Show build plan
+  terrafarm create --node-size 8gb --ttl 3h
+  Create farm with redefined node size and TTL
 
-  terrafarm plan --node-size 8gb --ttl 3h
-  Show build plan with redefined node size and TTL
-
-  terrafarm create --ttl 45m
-  Run farm with 45 min TTL
+  terrafarm create --force
+  Forced farm creation (without prompt)
 
   terrafarm destroy
   Destory all farm nodes
 
-  terrafarm show
-  Show info about build nodes
+  terrafarm status
+  Show info about terrafarm
 
 ```
 

@@ -37,7 +37,10 @@ type Prefs struct {
 // findAndReadPrefs read prefs from file and command-line arguments
 func findAndReadPrefs() *Prefs {
 	prefs := &Prefs{
+		Region:   "fra1",
+		NodeSize: "16gb",
 		TTL:      240,
+		User:     "builder",
 		Password: crypto.GenPassword(18, crypto.STRENGTH_MEDIUM),
 	}
 
@@ -187,6 +190,21 @@ func validatePrefs(prefs *Prefs) {
 
 	if prefs.Token == "" {
 		fmtc.Println("{r}Property token must be set{!}")
+		hasErrors = true
+	}
+
+	if prefs.Region == "" {
+		fmtc.Println("{r}Property region must be set{!}")
+		hasErrors = true
+	}
+
+	if prefs.NodeSize == "" {
+		fmtc.Println("{r}Property node-size must be set{!}")
+		hasErrors = true
+	}
+
+	if prefs.User == "" {
+		fmtc.Println("{r}Property user must be set{!}")
 		hasErrors = true
 	}
 
