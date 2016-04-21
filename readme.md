@@ -40,6 +40,14 @@ Preferences file must be named as `.terrafarm` and placed in your `HOME` directo
 
 Command-line arguments have higher priority and overwrite properties defined in preferences file.
 
+#### Debugging
+
+If you find an bug with TerraFarm, please include the detailed log. As a user, this information can help work around the problem and prepare fixes. 
+
+First of all, you should specify `-D` or `--debug` argument with TerraFarm to print the output of command which would be executed. It might be useful to know what exactly parameters would be passed to Terraform.
+
+Also keep in mind that TerraFarm works with Terraform and you should know how to debug it. We recommend to use `DEBUG` or `TRACE` values to find possible problems with Terraform. This will cause detailed logs to appear on stderr. To persist logged output you can set `TF_LOG_PATH` to write the log to a specific file.
+
 #### Usage
 
 ```
@@ -87,20 +95,6 @@ Examples:
 |------------|--------|
 | Stable | [![Build Status](https://travis-ci.org/essentialkaos/terrafarm.svg?branch=master)](https://travis-ci.org/essentialkaos/terrafarm) |
 | Unstable | [![Build Status](https://travis-ci.org/essentialkaos/terrafarm.svg?branch=develop)](https://travis-ci.org/essentialkaos/terrafarm) |
-
-#### Debugging
-
-If you find an bug with TerraFarm, please include the detailed log. 
-As a user, this information can help work around the problem and prepare fixes. 
-First of all, you should specify `-D` option with TerraFarm to print the output of 
-command which would be executed. It might be useful to know what exactly 
-parameters would be passed into the command.
-
-Also keep in mind that TerraFarm works with Terraform and you should 
-know how to debug it. We recommend to use `DEBUG` or `TRACE` values 
-to find possible problems with Terraform. This will cause detailed 
-logs to appear on stderr. To persist logged output you can set `TF_LOG_PATH` 
-to write the log to a specific file.
 
 #### License
 
