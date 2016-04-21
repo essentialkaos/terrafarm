@@ -338,11 +338,18 @@ func createCommand(prefs *Prefs) {
 
 // statusCommand is status command handler
 func statusCommand(prefs *Prefs) {
+	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
+
+	tokenValid := do.IsValidToken(prefs.Token)
+	fingerprintValid := do.IsFingerprintValid(prefs.Token, fingerprint)
+	regionValid := do.IsRegionValid(prefs.Token, prefs.Region)
+	sizeValid := do.IsSizeValid(prefs.Token, prefs.NodeSize)
+
 	fmtutil.Separator(false, "TERRAFARM")
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
 
-	if do.IsValidToken(prefs.Token) {
+	if tokenValid {
 		fmtc.Printf(" {g}✔{!}\n")
 	} else {
 		fmtc.Printf(" {r}✘{!}\n")
@@ -351,11 +358,9 @@ func statusCommand(prefs *Prefs) {
 	fmtc.Printf("  {*}%-16s{!} %s\n", "Private Key:", prefs.Key)
 	fmtc.Printf("  {*}%-16s{!} %s\n", "Public Key:", prefs.Key+".pub")
 
-	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
-
 	fmtc.Printf("  {*}%-16s{!} %s", "Fingerprint:", fingerprint)
 
-	if do.IsFingerprintValid(prefs.Token, fingerprint) {
+	if fingerprintValid {
 		fmtc.Printf(" {g}✔{!}\n")
 	} else {
 		fmtc.Printf(" {r}✘{!}\n")
@@ -374,7 +379,7 @@ func statusCommand(prefs *Prefs) {
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Region:", prefs.Region)
 
-	if do.IsRegionValid(prefs.Token, prefs.Region) {
+	if regionValid {
 		fmtc.Printf(" {g}✔{!}\n")
 	} else {
 		fmtc.Printf(" {r}✘{!}\n")
@@ -382,7 +387,7 @@ func statusCommand(prefs *Prefs) {
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Node size:", prefs.NodeSize)
 
-	if do.IsSizeValid(prefs.Token, prefs.NodeSize) {
+	if sizeValid {
 		fmtc.Printf(" {g}✔{!}\n")
 	} else {
 		fmtc.Printf(" {r}✘{!}\n")
