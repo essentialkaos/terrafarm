@@ -215,6 +215,7 @@ func startMonitor() {
 
 	for {
 		if !isTerrafarmActive() {
+			log.Info("Farm destroyed manually")
 			os.Exit(0)
 		}
 
@@ -431,11 +432,14 @@ func destroyCommand(prefs *Prefs) {
 	}
 
 	if !arg.GetB(ARG_FORCE) {
+		fmtc.NewLine()
+
 		if !terminal.ReadAnswer("Destroy farm? (y/N)", "n") {
-			fmtc.NewLine()
 			return
 		}
 	}
+
+	fmtutil.Separator(false)
 
 	vars, err := prefsToArgs(prefs)
 
@@ -443,8 +447,6 @@ func destroyCommand(prefs *Prefs) {
 		fmtc.Printf("{r}Can't parse prefs: %v{!}\n", err)
 		os.Exit(1)
 	}
-
-	fmtutil.Separator(false)
 
 	vars = append(vars, "-force")
 
