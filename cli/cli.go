@@ -353,7 +353,7 @@ func statusCommand(prefs *Prefs) {
 	case prefs.TTL > 120:
 		fmtc.Printf("  {*}%-16s{!} {y}%s{!}\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
 	default:
-		fmtc.Printf("  {*}%-16s{!} %s\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+		fmtc.Printf("  {*}%-16s{!} {g}%s{!}\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
 	}
 
 	if regionValid {
