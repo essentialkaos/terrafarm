@@ -22,20 +22,24 @@ import (
 	"pkg.re/essentialkaos/ek.v1/fmtc"
 	"pkg.re/essentialkaos/ek.v1/fmtutil"
 	"pkg.re/essentialkaos/ek.v1/fsutil"
+	"pkg.re/essentialkaos/ek.v1/jsonutil"
 	"pkg.re/essentialkaos/ek.v1/path"
+	"pkg.re/essentialkaos/ek.v1/terminal"
 	"pkg.re/essentialkaos/ek.v1/timeutil"
 	"pkg.re/essentialkaos/ek.v1/usage"
 
 	"gopkg.in/hlandau/passlib.v1/hash/sha2crypt"
 
 	sshkey "github.com/yosida95/golang-sshkey"
+
+	"github.com/essentialkaos/terrafarm/do"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 const (
 	APP  = "Terrafarm"
-	VER  = "0.3.1"
+	VER  = "0.4.0"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -58,12 +62,21 @@ const (
 const (
 	CMD_CREATE  = "create"
 	CMD_DESTROY = "destroy"
-	CMD_SHOW    = "show"
-	CMD_PLAN    = "plan"
+	CMD_STATUS  = "status"
 )
 
 // SRC_DIR is path to directory with terrafarm sources
 const SRC_DIR = "github.com/essentialkaos/terrafarm"
+
+// MONITOR_STATE_FILE is name of monitor state file
+const MONITOR_STATE_FILE = ".monitor"
+
+// ////////////////////////////////////////////////////////////////////////////////// //
+
+type MonitorState struct {
+	Pid          int   `json:"pid"`
+	DestroyAfter int64 `json:"destroy_after"`
+}
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
@@ -174,7 +187,21 @@ func checkDeps() {
 
 // startMonitor starts monitoring process
 func startMonitor() {
-	destroyTime := time.Unix(int64(arg.GetI(ARG_MONITOR)), 0)
+	destroyAfter := time.Unix(int64(arg.GetI(ARG_MONITOR)), 0)
+	monitorPid := os.Getpid()
+
+	state := &MonitorState{
+		Pid:          monitorPid,
+		DestroyAfter: int64(arg.GetI(ARG_MONITOR)),
+	}
+
+	stateFile := getMonitorStateFilePath()
+
+	err := saveMonitorState(stateFile, state)
+
+	if err != nil {
+		os.Exit(1)
+	}
 
 	for {
 		if !isTerrafarmActive() {
@@ -183,7 +210,7 @@ func startMonitor() {
 
 		time.Sleep(time.Minute)
 
-		if time.Now().Unix() <= destroyTime.Unix() {
+		if time.Now().Unix() <= destroyAfter.Unix() {
 			continue
 		}
 
@@ -202,8 +229,10 @@ func startMonitor() {
 			continue
 		}
 
-		os.Exit(0)
+		break
 	}
+
+	os.Remove(stateFile)
 }
 
 // processCommand execute some command
@@ -215,10 +244,8 @@ func processCommand(cmd string) {
 		createCommand(prefs)
 	case CMD_DESTROY, "delete", "stop":
 		destroyCommand(prefs)
-	case CMD_PLAN:
-		planCommand(prefs)
-	case CMD_SHOW, "info":
-		showCommand()
+	case CMD_STATUS, "info", "state":
+		statusCommand(prefs)
 	default:
 		fmtc.Printf("{r}Unknown command %s\n", cmd)
 		os.Exit(1)
@@ -232,9 +259,14 @@ func createCommand(prefs *Prefs) {
 		os.Exit(1)
 	}
 
-	printTerrafarmInfo(prefs)
+	statusCommand(prefs)
 
-	time.Sleep(3 * time.Second)
+	if !terminal.ReadAnswer("Create farm with this preferencies? (y/N)", "n") {
+		fmtc.NewLine()
+		return
+	}
+
+	fmtutil.Separator(false)
 
 	vars, err := prefsToArgs(prefs)
 
@@ -286,6 +318,92 @@ func createCommand(prefs *Prefs) {
 	}
 }
 
+// statusCommand is status command handler
+func statusCommand(prefs *Prefs) {
+
+	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
+
+	tokenValid := do.IsValidToken(prefs.Token)
+	fingerprintValid := do.IsFingerprintValid(prefs.Token, fingerprint)
+	regionValid := do.IsRegionValid(prefs.Token, prefs.Region)
+	sizeValid := do.IsSizeValid(prefs.Token, prefs.NodeSize)
+
+	fmtutil.Separator(false, "TERRAFARM")
+
+	if tokenValid {
+		fmtc.Printf("  {*}%-16s{!} %s {g}✔{!}\n", "Token:", getMaskedToken(prefs.Token))
+	} else {
+		fmtc.Printf("  {*}%-16s{!} %s {r}✘{!}\n", "Token:", getMaskedToken(prefs.Token))
+	}
+
+	fmtc.Printf("  {*}%-16s{!} %s\n", "Private Key:", prefs.Key)
+	fmtc.Printf("  {*}%-16s{!} %s\n", "Public Key:", prefs.Key+".pub")
+
+	if fingerprintValid {
+		fmtc.Printf("  {*}%-16s{!} %s {g}✔{!}\n", "Fingerprint:", fingerprint)
+	} else {
+		fmtc.Printf("  {*}%-16s{!} %s {r}✘{!}\n", "Fingerprint:", fingerprint)
+	}
+
+	switch {
+	case prefs.TTL <= 0:
+		fmtc.Printf("  {*}%-16s{!} {r}disabled{!}\n", "TTL:")
+	case prefs.TTL > 360:
+		fmtc.Printf("  {*}%-16s{!} {r}%s{!}\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+	case prefs.TTL > 120:
+		fmtc.Printf("  {*}%-16s{!} {y}%s{!}\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+	default:
+		fmtc.Printf("  {*}%-16s{!} %s\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+	}
+
+	if regionValid {
+		fmtc.Printf("  {*}%-16s{!} %s {g}✔{!}\n", "Region:", prefs.Region)
+	} else {
+		fmtc.Printf("  {*}%-16s{!} %s {r}✘{!}\n", "Region:", prefs.Region)
+	}
+
+	if sizeValid {
+		fmtc.Printf("  {*}%-16s{!} %s {g}✔{!}\n", "Node size:", prefs.NodeSize)
+	} else {
+		fmtc.Printf("  {*}%-16s{!} %s {r}✘{!}\n", "Node size:", prefs.NodeSize)
+	}
+
+	fmtc.Printf("  {*}%-16s{!} %s\n", "User:", prefs.User)
+
+	if prefs.Output != "" {
+		fmtc.Printf("  {*}%-16s{!} %s\n", "Output:", prefs.Output)
+	}
+
+	if !isTerrafarmActive() {
+		fmtc.Printf("  {*}%-16s{!} {s}stopped{!}\n", "State:")
+	} else {
+		fmtc.Printf("  {*}%-16s{!} {g}works{!}\n", "State:")
+
+		if isMonitorActive() {
+			state, err := readMonitorState(getMonitorStateFilePath())
+
+			if err != nil {
+				fmtc.Printf("  {*}%-16s{!} {r}unknown{!}\n", "Monitor:")
+			} else {
+				ttlEst := state.DestroyAfter - time.Now().Unix()
+
+				if ttlEst < 0 {
+					fmtc.Printf("  {*}%-16s{!} {g}works{!} {y}(destroying){!}\n", "Monitor:")
+				} else {
+					fmtc.Printf(
+						"  {*}%-16s{!} {g}works{!} {s}(%s to destroy){!}\n",
+						"Monitor:", timeutil.PrettyDuration(ttlEst),
+					)
+				}
+			}
+		} else {
+			fmtc.Printf("  {*}%-16s{!} {r}stopped{!}\n", "Monitor:")
+		}
+	}
+
+	fmtutil.Separator(false)
+}
+
 // destroyCommand is destroy command handler
 func destroyCommand(prefs *Prefs) {
 	if !isTerrafarmActive() {
@@ -313,96 +431,6 @@ func destroyCommand(prefs *Prefs) {
 	if err != nil {
 		fmtc.Printf("{r}Error while executing terraform: %v\n{!}", err)
 		os.Exit(1)
-	}
-
-	fmtutil.Separator(false)
-}
-
-// showCommand is show command handler
-func showCommand() {
-	fmtutil.Separator(false)
-
-	err := execTerraform("show", nil)
-
-	if err != nil {
-		fmtc.Printf("{r}Error while executing terraform: %v\n{!}", err)
-		os.Exit(1)
-	}
-
-	fmtutil.Separator(false)
-}
-
-// planCommand is plan command handler
-func planCommand(prefs *Prefs) {
-	printTerrafarmInfo(prefs)
-
-	time.Sleep(3 * time.Second)
-
-	vars, err := prefsToArgs(prefs)
-
-	if err != nil {
-		fmtc.Printf("{r}Can't parse prefs: %v{!}\n", err)
-		os.Exit(1)
-	}
-
-	if arg.GetB(ARG_DEBUG) {
-		fmtc.Printf("{s}EXEC → terraform plan %s{!}\n\n", strings.Join(vars, " "))
-	}
-
-	err = execTerraform("plan", vars)
-
-	if err != nil {
-		fmtc.Printf("{r}Error while executing terraform: %v\n{!}", err)
-		os.Exit(1)
-	}
-
-	fmtutil.Separator(false)
-}
-
-// printTerrafarmInfo print info from prefs
-func printTerrafarmInfo(prefs *Prefs) {
-	fmtutil.Separator(false, "TERRAFARM")
-
-	fmtc.Printf("  {*}%-16s{!} %s\n", "Token:", getMaskedToken(prefs.Token))
-
-	fmtc.Printf("  {*}%-16s{!} %s\n", "Private Key:", prefs.Key)
-	fmtc.Printf("  {*}%-16s{!} %s\n", "Public Key:", prefs.Key+".pub")
-
-	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
-
-	fmtc.Printf("  {*}%-16s{!} %s\n", "Fingerprint:", fingerprint)
-
-	switch {
-	case prefs.TTL <= 0:
-		fmtc.Printf("  {*}%-16s{!} {r}disabled{!}\n", "TTL:")
-	case prefs.TTL > 360:
-		fmtc.Printf("  {*}%-16s{!} {r}%s{!}\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
-	case prefs.TTL > 120:
-		fmtc.Printf("  {*}%-16s{!} {y}%s{!}\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
-	default:
-		fmtc.Printf("  {*}%-16s{!} %s\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
-	}
-
-	if prefs.Output != "" {
-		fmtc.Printf("  {*}%-16s{!} %s\n", "Output:", prefs.Output)
-	}
-
-	if prefs.Region != "" {
-		fmtc.Printf("  {*}%-16s{!} %s\n", "Region:", prefs.Region)
-	}
-
-	if prefs.NodeSize != "" {
-		fmtc.Printf("  {*}%-16s{!} %s\n", "Node size:", prefs.NodeSize)
-	}
-
-	if prefs.User != "" {
-		fmtc.Printf("  {*}%-16s{!} %s\n", "User:", prefs.User)
-	}
-
-	if isTerrafarmActive() {
-		fmtc.Printf("  {*}%-16s{!} {g}works{!}\n", "State:")
-	} else {
-		fmtc.Printf("  {*}%-16s{!} {y}stopped{!}\n", "State:")
 	}
 
 	fmtutil.Separator(false)
@@ -548,6 +576,23 @@ func isTerrafarmActive() bool {
 	return len(state.Modules[0].Resources) != 0
 }
 
+// isMonitorActive return true is monitor process is active
+func isMonitorActive() bool {
+	stateFile := getMonitorStateFilePath()
+
+	if !fsutil.IsExist(stateFile) {
+		return false
+	}
+
+	state, err := readMonitorState(stateFile)
+
+	if err != nil {
+		return false
+	}
+
+	return fsutil.IsExist(path.Join("/proc", fmtc.Sprintf("%d", state.Pid)))
+}
+
 // getDataDir return path to directory with terraform data
 func getDataDir() string {
 	return path.Join(getSrcDir(), "terradata")
@@ -561,6 +606,29 @@ func getSrcDir() string {
 // getStateFilePath return path to terraform state file
 func getStateFilePath() string {
 	return path.Join(getDataDir(), "terraform.tfstate")
+}
+
+// getMonitorStateFilePath return path to monitor state file
+func getMonitorStateFilePath() string {
+	return path.Join(getDataDir(), MONITOR_STATE_FILE)
+}
+
+// saveMonitorDestroyDate save monitor state to file
+func saveMonitorState(file string, state *MonitorState) error {
+	return jsonutil.EncodeToFile(file, state)
+}
+
+// readMonitorDestroyDate read monitor state from file
+func readMonitorState(file string) (*MonitorState, error) {
+	state := &MonitorState{}
+
+	err := jsonutil.DecodeFile(file, state)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return state, nil
 }
 
 // runMonitor run monitoring process
@@ -629,8 +697,7 @@ func showUsage() {
 
 	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean")
 	info.AddCommand(CMD_DESTROY, "Destroy farm droplets on DigitalOcean")
-	info.AddCommand(CMD_SHOW, "Show info about droplets in farm")
-	info.AddCommand(CMD_PLAN, "Show execution plan")
+	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferencies and status")
 
 	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "ttl")
 	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
@@ -643,11 +710,9 @@ func showUsage() {
 	info.AddOption(ARG_HELP, "Show this help message")
 	info.AddOption(ARG_VER, "Show version")
 
-	info.AddExample(CMD_PLAN, "Show build plan")
-	info.AddExample(CMD_PLAN+" --node-size 8gb --ttl 3h", "Show build plan with redefined node size and TTL")
-	info.AddExample(CMD_CREATE+" --ttl 45m", "Run farm with 45 min TTL")
+	info.AddExample(CMD_CREATE+" --node-size 8gb --ttl 3h", "Create farm with redefined node size and TTL")
 	info.AddExample(CMD_DESTROY, "Destory all farm nodes")
-	info.AddExample(CMD_SHOW, "Show info about build nodes")
+	info.AddExample(CMD_STATUS, "Show info about terrafarm")
 
 	info.Render()
 }
