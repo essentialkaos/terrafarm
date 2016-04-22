@@ -76,6 +76,9 @@ const MONITOR_STATE_FILE = ".monitor"
 // MONITOR_LOG_FILE is name of monitor log file
 const MONITOR_LOG_FILE = "monitor.log"
 
+// DATA_ENV_VAR is name of environment variable with path to data directory
+const DATA_ENV_VAR = "TERRADATA"
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 type MonitorState struct {
@@ -171,6 +174,13 @@ func checkEnv() {
 
 	if !fsutil.CheckPerms("DRW", srcDir) {
 		fmtc.Printf("{r}Source directory %s is not accessible{!}\n", srcDir)
+		os.Exit(1)
+	}
+
+	dataDir := getDataDir()
+
+	if !fsutil.CheckPerms("DRW", dataDir) {
+		fmtc.Printf("{r}Data directory %s is not accessible{!}\n", dataDir)
 		os.Exit(1)
 	}
 }
@@ -615,6 +625,10 @@ func isMonitorActive() bool {
 
 // getDataDir return path to directory with terraform data
 func getDataDir() string {
+	if envMap[DATA_ENV_VAR] != "" {
+		return envMap[DATA_ENV_VAR]
+	}
+
 	return path.Join(getSrcDir(), "terradata")
 }
 
