@@ -32,7 +32,6 @@ resource "digitalocean_droplet" "builder-x32" {
       "echo 'Installing RPMBuilder Node package...'",
       "yum -y -q install rpmbuilder-node",
       "echo 'Starting node configuration...'",
-      "yum -y -q install yum-utils",
       "yum-config-manager --disable kaos-release &> /dev/null",
       "yum-config-manager --enable kaos-release-i386 &> /dev/null",
       "sed -i 's#builder:!!#builder:${var.auth}#' /etc/shadow",

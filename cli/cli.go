@@ -40,7 +40,7 @@ import (
 
 const (
 	APP  = "Terrafarm"
-	VER  = "0.4.0"
+	VER  = "0.5.0"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -567,7 +567,7 @@ func execTerraform(logOutput bool, command string, args []string) error {
 			if logOutput {
 				log.Info(s.Text())
 			} else {
-				fmtc.Printf("  %s\n", s.Text())
+				fmtc.Printf("  %s\n", getColoredCommandOutput(s.Text()))
 			}
 		}
 	}()
@@ -587,6 +587,26 @@ func execTerraform(logOutput bool, command string, args []string) error {
 	fsutil.Pop()
 
 	return nil
+}
+
+// getColoredCommandOutput return command output with colored remote-exec
+func getColoredCommandOutput(line string) string {
+	// Remove garbage from line
+	line = strings.Replace(line, "\x1b[0m\x1b[0m", "", -1)
+
+	switch {
+	case strings.Contains(line, "-x32 (remote-exec)"):
+		return fmtc.Sprintf("{c}%s{!}", line)
+
+	case strings.Contains(line, "-x48 (remote-exec)"):
+		return fmtc.Sprintf("{b}%s{!}", line)
+
+	case strings.Contains(line, "-x64 (remote-exec)"):
+		return fmtc.Sprintf("{m}%s{!}", line)
+
+	default:
+		return line
+	}
 }
 
 // isTerrafarmActive return true if terrafarm already active
