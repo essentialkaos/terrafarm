@@ -46,20 +46,21 @@ const (
 )
 
 const (
-	ARG_TTL       = "t:ttl"
-	ARG_OUTPUT    = "o:output"
-	ARG_TOKEN     = "T:token"
-	ARG_KEY       = "K:key"
-	ARG_REGION    = "R:region"
-	ARG_NODE_SIZE = "N:node-size"
-	ARG_USER      = "U:user"
-	ARG_PASSWORD  = "P:password"
-	ARG_DEBUG     = "D:debug"
-	ARG_MONITOR   = "m:monitor"
-	ARG_FORCE     = "f:force"
-	ARG_NO_COLOR  = "nc:no-color"
-	ARG_HELP      = "h:help"
-	ARG_VER       = "v:version"
+	ARG_TTL         = "t:ttl"
+	ARG_OUTPUT      = "o:output"
+	ARG_TOKEN       = "T:token"
+	ARG_KEY         = "K:key"
+	ARG_REGION      = "R:region"
+	ARG_NODE_SIZE   = "N:node-size"
+	ARG_USER        = "U:user"
+	ARG_PASSWORD    = "P:password"
+	ARG_DEBUG       = "D:debug"
+	ARG_MONITOR     = "m:monitor"
+	ARG_FORCE       = "f:force"
+	ARG_NO_VALIDATE = "nv:no-validate"
+	ARG_NO_COLOR    = "nc:no-color"
+	ARG_HELP        = "h:help"
+	ARG_VER         = "v:version"
 )
 
 const (
@@ -91,19 +92,20 @@ type MonitorState struct {
 
 // argMap is map with supported command-line arguments
 var argMap = arg.Map{
-	ARG_TTL:       &arg.V{},
-	ARG_OUTPUT:    &arg.V{},
-	ARG_TOKEN:     &arg.V{},
-	ARG_KEY:       &arg.V{},
-	ARG_REGION:    &arg.V{},
-	ARG_NODE_SIZE: &arg.V{},
-	ARG_USER:      &arg.V{},
-	ARG_DEBUG:     &arg.V{Type: arg.BOOL},
-	ARG_MONITOR:   &arg.V{Type: arg.INT},
-	ARG_FORCE:     &arg.V{Type: arg.BOOL},
-	ARG_NO_COLOR:  &arg.V{Type: arg.BOOL},
-	ARG_HELP:      &arg.V{Type: arg.BOOL, Alias: "u:usage"},
-	ARG_VER:       &arg.V{Type: arg.BOOL, Alias: "ver"},
+	ARG_TTL:         &arg.V{},
+	ARG_OUTPUT:      &arg.V{},
+	ARG_TOKEN:       &arg.V{},
+	ARG_KEY:         &arg.V{},
+	ARG_REGION:      &arg.V{},
+	ARG_NODE_SIZE:   &arg.V{},
+	ARG_USER:        &arg.V{},
+	ARG_DEBUG:       &arg.V{Type: arg.BOOL},
+	ARG_MONITOR:     &arg.V{Type: arg.INT},
+	ARG_FORCE:       &arg.V{Type: arg.BOOL},
+	ARG_NO_VALIDATE: &arg.V{Type: arg.BOOL},
+	ARG_NO_COLOR:    &arg.V{Type: arg.BOOL},
+	ARG_HELP:        &arg.V{Type: arg.BOOL, Alias: "u:usage"},
+	ARG_VER:         &arg.V{Type: arg.BOOL, Alias: "ver"},
 }
 
 // depList is slice with dependencies required by terrafarm
@@ -351,33 +353,34 @@ func createCommand(prefs *Prefs) {
 
 // statusCommand is status command handler
 func statusCommand(prefs *Prefs) {
+	var (
+		tokenValid       bool
+		fingerprintValid bool
+		regionValid      bool
+		sizeValid        bool
+	)
+
 	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
 
-	tokenValid := do.IsValidToken(prefs.Token)
-	fingerprintValid := do.IsFingerprintValid(prefs.Token, fingerprint)
-	regionValid := do.IsRegionValid(prefs.Token, prefs.Region)
-	sizeValid := do.IsSizeValid(prefs.Token, prefs.NodeSize)
+	if !arg.GetB(ARG_NO_VALIDATE) {
+		tokenValid = do.IsValidToken(prefs.Token)
+		fingerprintValid = do.IsFingerprintValid(prefs.Token, fingerprint)
+		regionValid = do.IsRegionValid(prefs.Token, prefs.Region)
+		sizeValid = do.IsSizeValid(prefs.Token, prefs.NodeSize)
+	}
 
 	fmtutil.Separator(false, "TERRAFARM")
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
 
-	if tokenValid {
-		fmtc.Printf(" {g}✔{!}\n")
-	} else {
-		fmtc.Printf(" {r}✘{!}\n")
-	}
+	printValidationMarker(tokenValid)
 
 	fmtc.Printf("  {*}%-16s{!} %s\n", "Private Key:", prefs.Key)
 	fmtc.Printf("  {*}%-16s{!} %s\n", "Public Key:", prefs.Key+".pub")
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Fingerprint:", fingerprint)
 
-	if fingerprintValid {
-		fmtc.Printf(" {g}✔{!}\n")
-	} else {
-		fmtc.Printf(" {r}✘{!}\n")
-	}
+	printValidationMarker(fingerprintValid)
 
 	switch {
 	case prefs.TTL <= 0:
@@ -392,19 +395,11 @@ func statusCommand(prefs *Prefs) {
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Region:", prefs.Region)
 
-	if regionValid {
-		fmtc.Printf(" {g}✔{!}\n")
-	} else {
-		fmtc.Printf(" {r}✘{!}\n")
-	}
+	printValidationMarker(regionValid)
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Node size:", prefs.NodeSize)
 
-	if sizeValid {
-		fmtc.Printf(" {g}✔{!}\n")
-	} else {
-		fmtc.Printf(" {r}✘{!}\n")
-	}
+	printValidationMarker(sizeValid)
 
 	fmtc.Printf("  {*}%-16s{!} %s\n", "User:", prefs.User)
 
@@ -440,6 +435,18 @@ func statusCommand(prefs *Prefs) {
 	}
 
 	fmtutil.Separator(false)
+}
+
+// printValidationMarker print validation mark
+func printValidationMarker(value bool) {
+	switch {
+	case arg.GetB(ARG_NO_VALIDATE) == true:
+		fmtc.Printf("\n")
+	case value == true:
+		fmtc.Printf(" {g}✔{!}\n")
+	case value == false:
+		fmtc.Printf(" {r}✘{!}\n")
+	}
 }
 
 // destroyCommand is destroy command handler
@@ -792,6 +799,7 @@ func showUsage() {
 	info.AddOption(ARG_NODE_SIZE, "Droplet size on DigitalOcean", "size")
 	info.AddOption(ARG_USER, "Build node user name", "username")
 	info.AddOption(ARG_FORCE, "Force command execution")
+	info.AddOption(ARG_NO_VALIDATE, "Don't validate preferencies")
 	info.AddOption(ARG_NO_COLOR, "Disable colors in output")
 	info.AddOption(ARG_HELP, "Show this help message")
 	info.AddOption(ARG_VER, "Show version")
