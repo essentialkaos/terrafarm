@@ -25,6 +25,7 @@ import (
 	"pkg.re/essentialkaos/ek.v1/jsonutil"
 	"pkg.re/essentialkaos/ek.v1/log"
 	"pkg.re/essentialkaos/ek.v1/path"
+	"pkg.re/essentialkaos/ek.v1/signal"
 	"pkg.re/essentialkaos/ek.v1/terminal"
 	"pkg.re/essentialkaos/ek.v1/timeutil"
 	"pkg.re/essentialkaos/ek.v1/usage"
@@ -40,25 +41,26 @@ import (
 
 const (
 	APP  = "Terrafarm"
-	VER  = "0.4.0"
+	VER  = "0.5.0"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
 const (
-	ARG_TTL       = "t:ttl"
-	ARG_OUTPUT    = "o:output"
-	ARG_TOKEN     = "T:token"
-	ARG_KEY       = "K:key"
-	ARG_REGION    = "R:region"
-	ARG_NODE_SIZE = "N:node-size"
-	ARG_USER      = "U:user"
-	ARG_PASSWORD  = "P:password"
-	ARG_DEBUG     = "D:debug"
-	ARG_MONITOR   = "m:monitor"
-	ARG_FORCE     = "f:force"
-	ARG_NO_COLOR  = "nc:no-color"
-	ARG_HELP      = "h:help"
-	ARG_VER       = "v:version"
+	ARG_TTL         = "t:ttl"
+	ARG_OUTPUT      = "o:output"
+	ARG_TOKEN       = "T:token"
+	ARG_KEY         = "K:key"
+	ARG_REGION      = "R:region"
+	ARG_NODE_SIZE   = "N:node-size"
+	ARG_USER        = "U:user"
+	ARG_PASSWORD    = "P:password"
+	ARG_DEBUG       = "D:debug"
+	ARG_MONITOR     = "m:monitor"
+	ARG_FORCE       = "f:force"
+	ARG_NO_VALIDATE = "nv:no-validate"
+	ARG_NO_COLOR    = "nc:no-color"
+	ARG_HELP        = "h:help"
+	ARG_VER         = "v:version"
 )
 
 const (
@@ -67,39 +69,59 @@ const (
 	CMD_STATUS  = "status"
 )
 
+// TERRAFORM_DATA_DIR is name of dir with terraform data
+const TERRAFORM_DATA_DIR = "terradata"
+
+// TERRAFORM_STATE_FILE is name terraform state file name
+const TERRAFORM_STATE_FILE = "terraform.tfstate"
+
 // SRC_DIR is path to directory with terrafarm sources
 const SRC_DIR = "github.com/essentialkaos/terrafarm"
 
 // MONITOR_STATE_FILE is name of monitor state file
-const MONITOR_STATE_FILE = ".monitor"
+const MONITOR_STATE_FILE = ".monitor-state"
+
+// FARM_STATE_FILE is name of terrafarm state file
+const FARM_STATE_FILE = ".farm-state"
 
 // MONITOR_LOG_FILE is name of monitor log file
 const MONITOR_LOG_FILE = "monitor.log"
 
+// DATA_ENV_VAR is name of environment variable with path to data directory
+const DATA_ENV_VAR = "TERRADATA"
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
+// MonitorState cotains monitor specific info
 type MonitorState struct {
 	Pid          int   `json:"pid"`
 	DestroyAfter int64 `json:"destroy_after"`
+}
+
+// FarmState contains farm specific info
+type FarmState struct {
+	Prefs       *Prefs `json:"prefs"`
+	Fingerprint string `json:"fingerprint"`
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 // argMap is map with supported command-line arguments
 var argMap = arg.Map{
-	ARG_TTL:       &arg.V{},
-	ARG_OUTPUT:    &arg.V{},
-	ARG_TOKEN:     &arg.V{},
-	ARG_KEY:       &arg.V{},
-	ARG_REGION:    &arg.V{},
-	ARG_NODE_SIZE: &arg.V{},
-	ARG_USER:      &arg.V{},
-	ARG_DEBUG:     &arg.V{Type: arg.BOOL},
-	ARG_MONITOR:   &arg.V{Type: arg.INT},
-	ARG_FORCE:     &arg.V{Type: arg.BOOL},
-	ARG_NO_COLOR:  &arg.V{Type: arg.BOOL},
-	ARG_HELP:      &arg.V{Type: arg.BOOL, Alias: "u:usage"},
-	ARG_VER:       &arg.V{Type: arg.BOOL, Alias: "ver"},
+	ARG_TTL:         &arg.V{},
+	ARG_OUTPUT:      &arg.V{},
+	ARG_TOKEN:       &arg.V{},
+	ARG_KEY:         &arg.V{},
+	ARG_REGION:      &arg.V{},
+	ARG_NODE_SIZE:   &arg.V{},
+	ARG_USER:        &arg.V{},
+	ARG_DEBUG:       &arg.V{Type: arg.BOOL},
+	ARG_MONITOR:     &arg.V{Type: arg.INT},
+	ARG_FORCE:       &arg.V{Type: arg.BOOL},
+	ARG_NO_VALIDATE: &arg.V{Type: arg.BOOL},
+	ARG_NO_COLOR:    &arg.V{Type: arg.BOOL},
+	ARG_HELP:        &arg.V{Type: arg.BOOL, Alias: "u:usage"},
+	ARG_VER:         &arg.V{Type: arg.BOOL, Alias: "ver"},
 }
 
 // depList is slice with dependencies required by terrafarm
@@ -116,7 +138,7 @@ var envMap = env.Get()
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 func Init() {
-	runtime.GOMAXPROCS(1)
+	runtime.GOMAXPROCS(2)
 
 	args, errs := arg.Parse(argMap)
 
@@ -171,6 +193,13 @@ func checkEnv() {
 
 	if !fsutil.CheckPerms("DRW", srcDir) {
 		fmtc.Printf("{r}Source directory %s is not accessible{!}\n", srcDir)
+		os.Exit(1)
+	}
+
+	dataDir := getDataDir()
+
+	if !fsutil.CheckPerms("DRW", dataDir) {
+		fmtc.Printf("{r}Data directory %s is not accessible{!}\n", dataDir)
 		os.Exit(1)
 	}
 }
@@ -293,6 +322,8 @@ func createCommand(prefs *Prefs) {
 		os.Exit(1)
 	}
 
+	addSignalInterception()
+
 	if arg.GetB(ARG_DEBUG) {
 		fmtc.Printf("{s}EXEC → terraform apply %s{!}\n\n", strings.Join(vars, " "))
 	}
@@ -334,37 +365,51 @@ func createCommand(prefs *Prefs) {
 
 		fmtutil.Separator(false)
 	}
+
+	saveState(prefs)
 }
 
 // statusCommand is status command handler
 func statusCommand(prefs *Prefs) {
+	var (
+		tokenValid       bool
+		fingerprintValid bool
+		regionValid      bool
+		sizeValid        bool
+	)
+
+	disableValidate := arg.GetB(ARG_NO_VALIDATE)
 	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
 
-	tokenValid := do.IsValidToken(prefs.Token)
-	fingerprintValid := do.IsFingerprintValid(prefs.Token, fingerprint)
-	regionValid := do.IsRegionValid(prefs.Token, prefs.Region)
-	sizeValid := do.IsSizeValid(prefs.Token, prefs.NodeSize)
+	if isTerrafarmActive() {
+		farmState, err := readFarmState(getFarmStateFilePath())
+
+		if err == nil {
+			disableValidate = true
+			prefs = farmState.Prefs
+			fingerprint = farmState.Fingerprint
+		}
+	}
+
+	if !disableValidate {
+		tokenValid = do.IsValidToken(prefs.Token)
+		fingerprintValid = do.IsFingerprintValid(prefs.Token, fingerprint)
+		regionValid = do.IsRegionValid(prefs.Token, prefs.Region)
+		sizeValid = do.IsSizeValid(prefs.Token, prefs.NodeSize)
+	}
 
 	fmtutil.Separator(false, "TERRAFARM")
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
 
-	if tokenValid {
-		fmtc.Printf(" {g}✔{!}\n")
-	} else {
-		fmtc.Printf(" {r}✘{!}\n")
-	}
+	printValidationMarker(tokenValid, disableValidate)
 
 	fmtc.Printf("  {*}%-16s{!} %s\n", "Private Key:", prefs.Key)
 	fmtc.Printf("  {*}%-16s{!} %s\n", "Public Key:", prefs.Key+".pub")
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Fingerprint:", fingerprint)
 
-	if fingerprintValid {
-		fmtc.Printf(" {g}✔{!}\n")
-	} else {
-		fmtc.Printf(" {r}✘{!}\n")
-	}
+	printValidationMarker(fingerprintValid, disableValidate)
 
 	switch {
 	case prefs.TTL <= 0:
@@ -379,19 +424,11 @@ func statusCommand(prefs *Prefs) {
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Region:", prefs.Region)
 
-	if regionValid {
-		fmtc.Printf(" {g}✔{!}\n")
-	} else {
-		fmtc.Printf(" {r}✘{!}\n")
-	}
+	printValidationMarker(regionValid, disableValidate)
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Node size:", prefs.NodeSize)
 
-	if sizeValid {
-		fmtc.Printf(" {g}✔{!}\n")
-	} else {
-		fmtc.Printf(" {r}✘{!}\n")
-	}
+	printValidationMarker(sizeValid, disableValidate)
 
 	fmtc.Printf("  {*}%-16s{!} %s\n", "User:", prefs.User)
 
@@ -453,6 +490,8 @@ func destroyCommand(prefs *Prefs) {
 		os.Exit(1)
 	}
 
+	addSignalInterception()
+
 	vars = append(vars, "-force")
 
 	if arg.GetB(ARG_DEBUG) {
@@ -467,6 +506,38 @@ func destroyCommand(prefs *Prefs) {
 	}
 
 	fmtutil.Separator(false)
+
+	os.Remove(getFarmStateFilePath())
+}
+
+// saveFarmState collect and save farm state into file
+func saveState(prefs *Prefs) {
+	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
+
+	farmState := &FarmState{
+		Prefs:       prefs,
+		Fingerprint: fingerprint,
+	}
+
+	farmState.Prefs.Token = getCryptedToken(prefs.Token)
+
+	err := saveFarmState(getFarmStateFilePath(), farmState)
+
+	if err != nil {
+		fmtc.Printf("Can't save farm state: %v\n", err)
+	}
+}
+
+// printValidationMarker print validation mark
+func printValidationMarker(value, disableValidate bool) {
+	switch {
+	case disableValidate == true:
+		fmtc.Printf("\n")
+	case value == true:
+		fmtc.Printf(" {g}✔{!}\n")
+	case value == false:
+		fmtc.Printf(" {r}✘{!}\n")
+	}
 }
 
 // getFingerprint return fingerprint for public key
@@ -493,11 +564,20 @@ func getPasswordHash(password string) (string, error) {
 
 // getMaskedToken return first and last 8 symbols of token
 func getMaskedToken(token string) string {
-	if len(token) <= 16 {
+	if len(token) != 64 {
 		return ""
 	}
 
-	return token[:8] + "..." + token[len(token)-8:]
+	return token[:8] + "..." + token[56:]
+}
+
+// getCryptedToken return token with masked part
+func getCryptedToken(token string) string {
+	if len(token) != 64 {
+		return ""
+	}
+
+	return token[:8] + "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" + token[56:]
 }
 
 // prefsToArgs return prefs as command line arguments for terraform
@@ -557,7 +637,7 @@ func execTerraform(logOutput bool, command string, args []string) error {
 			if logOutput {
 				log.Info(s.Text())
 			} else {
-				fmtc.Printf("  %s\n", s.Text())
+				fmtc.Printf("  %s\n", getColoredCommandOutput(s.Text()))
 			}
 		}
 	}()
@@ -579,9 +659,37 @@ func execTerraform(logOutput bool, command string, args []string) error {
 	return nil
 }
 
+// getColoredCommandOutput return command output with colored remote-exec
+func getColoredCommandOutput(line string) string {
+	// Remove garbage from line
+	line = strings.Replace(line, "\x1b[0m\x1b[0m", "", -1)
+
+	switch {
+	case strings.Contains(line, "-x32 (remote-exec)"):
+		return fmtc.Sprintf("{c}%s{!}", line)
+
+	case strings.Contains(line, "-x48 (remote-exec)"):
+		return fmtc.Sprintf("{b}%s{!}", line)
+
+	case strings.Contains(line, "-x64 (remote-exec)"):
+		return fmtc.Sprintf("{m}%s{!}", line)
+
+	default:
+		return line
+	}
+}
+
+// addSignalInterception add interceptors for INT и TERM signals
+func addSignalInterception() {
+	signal.Handlers{
+		signal.INT:  signalInterceptor,
+		signal.TERM: signalInterceptor,
+	}.TrackAsync()
+}
+
 // isTerrafarmActive return true if terrafarm already active
 func isTerrafarmActive() bool {
-	stateFile := getStateFilePath()
+	stateFile := getTerraformStateFilePath()
 
 	if !fsutil.IsExist(stateFile) {
 		return false
@@ -615,7 +723,11 @@ func isMonitorActive() bool {
 
 // getDataDir return path to directory with terraform data
 func getDataDir() string {
-	return path.Join(getSrcDir(), "terradata")
+	if envMap[DATA_ENV_VAR] != "" {
+		return envMap[DATA_ENV_VAR]
+	}
+
+	return path.Join(getSrcDir(), TERRAFORM_DATA_DIR)
 }
 
 // getSrcDir return path to directory with terrafarm sources
@@ -623,9 +735,14 @@ func getSrcDir() string {
 	return path.Join(envMap["GOPATH"], "src", SRC_DIR)
 }
 
-// getStateFilePath return path to terraform state file
-func getStateFilePath() string {
-	return path.Join(getDataDir(), "terraform.tfstate")
+// getTerraformStateFilePath return path to terraform state file
+func getTerraformStateFilePath() string {
+	return path.Join(getDataDir(), TERRAFORM_STATE_FILE)
+}
+
+// getFarmStateFilePath return path to terrafarm state file
+func getFarmStateFilePath() string {
+	return path.Join(getDataDir(), FARM_STATE_FILE)
 }
 
 // getMonitorLogFilePath return path to monitor log file
@@ -638,7 +755,7 @@ func getMonitorStateFilePath() string {
 	return path.Join(getDataDir(), MONITOR_STATE_FILE)
 }
 
-// saveMonitorDestroyDate save monitor state to file
+// saveMonitorState save monitor state to file
 func saveMonitorState(file string, state *MonitorState) error {
 	return jsonutil.EncodeToFile(file, state)
 }
@@ -646,6 +763,24 @@ func saveMonitorState(file string, state *MonitorState) error {
 // readMonitorDestroyDate read monitor state from file
 func readMonitorState(file string) (*MonitorState, error) {
 	state := &MonitorState{}
+
+	err := jsonutil.DecodeFile(file, state)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return state, nil
+}
+
+// saveFarmState save farm state to file
+func saveFarmState(file string, state *FarmState) error {
+	return jsonutil.EncodeToFile(file, state)
+}
+
+// readMonitorDestroyDate read farm state from file
+func readFarmState(file string) (*FarmState, error) {
+	state := &FarmState{}
 
 	err := jsonutil.DecodeFile(file, state)
 
@@ -687,7 +822,7 @@ func exportNodeList(prefs *Prefs) error {
 
 	defer fd.Close()
 
-	state, err := readTFState(getStateFilePath())
+	state, err := readTFState(getTerraformStateFilePath())
 
 	if err != nil {
 		return fmtc.Errorf("Can't read state file: %v", err)
@@ -722,6 +857,11 @@ func exportNodeList(prefs *Prefs) error {
 	return nil
 }
 
+// signalInterceptor is TERM and INT signal handler
+func signalInterceptor() {
+	fmtc.Println("\n{y}You can't cancel command execution in this time{!}")
+}
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 // showUsage show help content
@@ -740,6 +880,7 @@ func showUsage() {
 	info.AddOption(ARG_NODE_SIZE, "Droplet size on DigitalOcean", "size")
 	info.AddOption(ARG_USER, "Build node user name", "username")
 	info.AddOption(ARG_FORCE, "Force command execution")
+	info.AddOption(ARG_NO_VALIDATE, "Don't validate preferencies")
 	info.AddOption(ARG_NO_COLOR, "Disable colors in output")
 	info.AddOption(ARG_HELP, "Show this help message")
 	info.AddOption(ARG_VER, "Show version")

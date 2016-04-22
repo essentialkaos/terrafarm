@@ -1,3 +1,4 @@
 *.tfstate*
-terradata/.monitor
+terradata/.monitor-state
+terradata/.farm-state
 monitor.log
