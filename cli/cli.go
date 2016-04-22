@@ -25,6 +25,7 @@ import (
 	"pkg.re/essentialkaos/ek.v1/jsonutil"
 	"pkg.re/essentialkaos/ek.v1/log"
 	"pkg.re/essentialkaos/ek.v1/path"
+	"pkg.re/essentialkaos/ek.v1/signal"
 	"pkg.re/essentialkaos/ek.v1/terminal"
 	"pkg.re/essentialkaos/ek.v1/timeutil"
 	"pkg.re/essentialkaos/ek.v1/usage"
@@ -119,7 +120,7 @@ var envMap = env.Get()
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 func Init() {
-	runtime.GOMAXPROCS(1)
+	runtime.GOMAXPROCS(2)
 
 	args, errs := arg.Parse(argMap)
 
@@ -303,6 +304,8 @@ func createCommand(prefs *Prefs) {
 		os.Exit(1)
 	}
 
+	addSignalInterception()
+
 	if arg.GetB(ARG_DEBUG) {
 		fmtc.Printf("{s}EXEC → terraform apply %s{!}\n\n", strings.Join(vars, " "))
 	}
@@ -463,6 +466,8 @@ func destroyCommand(prefs *Prefs) {
 		os.Exit(1)
 	}
 
+	addSignalInterception()
+
 	vars = append(vars, "-force")
 
 	if arg.GetB(ARG_DEBUG) {
@@ -607,6 +612,14 @@ func getColoredCommandOutput(line string) string {
 	default:
 		return line
 	}
+}
+
+// addSignalInterception add interceptors for INT и TERM signals
+func addSignalInterception() {
+	signal.Handlers{
+		signal.INT:  signalInterceptor,
+		signal.TERM: signalInterceptor,
+	}.TrackAsync()
 }
 
 // isTerrafarmActive return true if terrafarm already active
@@ -754,6 +767,11 @@ func exportNodeList(prefs *Prefs) error {
 	fmtc.Fprintln(fd, strings.Join(nodes, "\n"))
 
 	return nil
+}
+
+// signalInterceptor is TERM and INT signal handler
+func signalInterceptor() {
+	fmtc.Println("\n{y}You can't cancel command execution in this time{!}")
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
