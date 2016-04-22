@@ -69,11 +69,20 @@ const (
 	CMD_STATUS  = "status"
 )
 
+// TERRAFORM_DATA_DIR is name of dir with terraform data
+const TERRAFORM_DATA_DIR = "terradata"
+
+// TERRAFORM_STATE_FILE is name terraform state file name
+const TERRAFORM_STATE_FILE = "terraform.tfstate"
+
 // SRC_DIR is path to directory with terrafarm sources
 const SRC_DIR = "github.com/essentialkaos/terrafarm"
 
 // MONITOR_STATE_FILE is name of monitor state file
-const MONITOR_STATE_FILE = ".monitor"
+const MONITOR_STATE_FILE = ".monitor-state"
+
+// FARM_STATE_FILE is name of terrafarm state file
+const FARM_STATE_FILE = ".farm-state"
 
 // MONITOR_LOG_FILE is name of monitor log file
 const MONITOR_LOG_FILE = "monitor.log"
@@ -83,9 +92,16 @@ const DATA_ENV_VAR = "TERRADATA"
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
+// MonitorState cotains monitor specific info
 type MonitorState struct {
 	Pid          int   `json:"pid"`
 	DestroyAfter int64 `json:"destroy_after"`
+}
+
+// FarmState contains farm specific info
+type FarmState struct {
+	Prefs       *Prefs `json:"prefs"`
+	Fingerprint string `json:"fingerprint"`
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -349,6 +365,8 @@ func createCommand(prefs *Prefs) {
 
 		fmtutil.Separator(false)
 	}
+
+	saveState(prefs)
 }
 
 // statusCommand is status command handler
@@ -360,9 +378,20 @@ func statusCommand(prefs *Prefs) {
 		sizeValid        bool
 	)
 
+	disableValidate := arg.GetB(ARG_NO_VALIDATE)
 	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
 
-	if !arg.GetB(ARG_NO_VALIDATE) {
+	if isTerrafarmActive() {
+		farmState, err := readFarmState(getFarmStateFilePath())
+
+		if err == nil {
+			disableValidate = true
+			prefs = farmState.Prefs
+			fingerprint = farmState.Fingerprint
+		}
+	}
+
+	if !disableValidate {
 		tokenValid = do.IsValidToken(prefs.Token)
 		fingerprintValid = do.IsFingerprintValid(prefs.Token, fingerprint)
 		regionValid = do.IsRegionValid(prefs.Token, prefs.Region)
@@ -373,14 +402,14 @@ func statusCommand(prefs *Prefs) {
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
 
-	printValidationMarker(tokenValid)
+	printValidationMarker(tokenValid, disableValidate)
 
 	fmtc.Printf("  {*}%-16s{!} %s\n", "Private Key:", prefs.Key)
 	fmtc.Printf("  {*}%-16s{!} %s\n", "Public Key:", prefs.Key+".pub")
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Fingerprint:", fingerprint)
 
-	printValidationMarker(fingerprintValid)
+	printValidationMarker(fingerprintValid, disableValidate)
 
 	switch {
 	case prefs.TTL <= 0:
@@ -395,11 +424,11 @@ func statusCommand(prefs *Prefs) {
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Region:", prefs.Region)
 
-	printValidationMarker(regionValid)
+	printValidationMarker(regionValid, disableValidate)
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Node size:", prefs.NodeSize)
 
-	printValidationMarker(sizeValid)
+	printValidationMarker(sizeValid, disableValidate)
 
 	fmtc.Printf("  {*}%-16s{!} %s\n", "User:", prefs.User)
 
@@ -435,18 +464,6 @@ func statusCommand(prefs *Prefs) {
 	}
 
 	fmtutil.Separator(false)
-}
-
-// printValidationMarker print validation mark
-func printValidationMarker(value bool) {
-	switch {
-	case arg.GetB(ARG_NO_VALIDATE) == true:
-		fmtc.Printf("\n")
-	case value == true:
-		fmtc.Printf(" {g}✔{!}\n")
-	case value == false:
-		fmtc.Printf(" {r}✘{!}\n")
-	}
 }
 
 // destroyCommand is destroy command handler
@@ -489,6 +506,38 @@ func destroyCommand(prefs *Prefs) {
 	}
 
 	fmtutil.Separator(false)
+
+	os.Remove(getFarmStateFilePath())
+}
+
+// saveFarmState collect and save farm state into file
+func saveState(prefs *Prefs) {
+	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
+
+	farmState := &FarmState{
+		Prefs:       prefs,
+		Fingerprint: fingerprint,
+	}
+
+	farmState.Prefs.Token = getCryptedToken(prefs.Token)
+
+	err := saveFarmState(getFarmStateFilePath(), farmState)
+
+	if err != nil {
+		fmtc.Printf("Can't save farm state: %v\n", err)
+	}
+}
+
+// printValidationMarker print validation mark
+func printValidationMarker(value, disableValidate bool) {
+	switch {
+	case disableValidate == true:
+		fmtc.Printf("\n")
+	case value == true:
+		fmtc.Printf(" {g}✔{!}\n")
+	case value == false:
+		fmtc.Printf(" {r}✘{!}\n")
+	}
 }
 
 // getFingerprint return fingerprint for public key
@@ -515,11 +564,20 @@ func getPasswordHash(password string) (string, error) {
 
 // getMaskedToken return first and last 8 symbols of token
 func getMaskedToken(token string) string {
-	if len(token) <= 16 {
+	if len(token) != 64 {
 		return ""
 	}
 
-	return token[:8] + "..." + token[len(token)-8:]
+	return token[:8] + "..." + token[56:]
+}
+
+// getCryptedToken return token with masked part
+func getCryptedToken(token string) string {
+	if len(token) != 64 {
+		return ""
+	}
+
+	return token[:8] + "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" + token[56:]
 }
 
 // prefsToArgs return prefs as command line arguments for terraform
@@ -631,7 +689,7 @@ func addSignalInterception() {
 
 // isTerrafarmActive return true if terrafarm already active
 func isTerrafarmActive() bool {
-	stateFile := getStateFilePath()
+	stateFile := getTerraformStateFilePath()
 
 	if !fsutil.IsExist(stateFile) {
 		return false
@@ -669,7 +727,7 @@ func getDataDir() string {
 		return envMap[DATA_ENV_VAR]
 	}
 
-	return path.Join(getSrcDir(), "terradata")
+	return path.Join(getSrcDir(), TERRAFORM_DATA_DIR)
 }
 
 // getSrcDir return path to directory with terrafarm sources
@@ -677,9 +735,14 @@ func getSrcDir() string {
 	return path.Join(envMap["GOPATH"], "src", SRC_DIR)
 }
 
-// getStateFilePath return path to terraform state file
-func getStateFilePath() string {
-	return path.Join(getDataDir(), "terraform.tfstate")
+// getTerraformStateFilePath return path to terraform state file
+func getTerraformStateFilePath() string {
+	return path.Join(getDataDir(), TERRAFORM_STATE_FILE)
+}
+
+// getFarmStateFilePath return path to terrafarm state file
+func getFarmStateFilePath() string {
+	return path.Join(getDataDir(), FARM_STATE_FILE)
 }
 
 // getMonitorLogFilePath return path to monitor log file
@@ -692,7 +755,7 @@ func getMonitorStateFilePath() string {
 	return path.Join(getDataDir(), MONITOR_STATE_FILE)
 }
 
-// saveMonitorDestroyDate save monitor state to file
+// saveMonitorState save monitor state to file
 func saveMonitorState(file string, state *MonitorState) error {
 	return jsonutil.EncodeToFile(file, state)
 }
@@ -700,6 +763,24 @@ func saveMonitorState(file string, state *MonitorState) error {
 // readMonitorDestroyDate read monitor state from file
 func readMonitorState(file string) (*MonitorState, error) {
 	state := &MonitorState{}
+
+	err := jsonutil.DecodeFile(file, state)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return state, nil
+}
+
+// saveFarmState save farm state to file
+func saveFarmState(file string, state *FarmState) error {
+	return jsonutil.EncodeToFile(file, state)
+}
+
+// readMonitorDestroyDate read farm state from file
+func readFarmState(file string) (*FarmState, error) {
+	state := &FarmState{}
 
 	err := jsonutil.DecodeFile(file, state)
 
@@ -741,7 +822,7 @@ func exportNodeList(prefs *Prefs) error {
 
 	defer fd.Close()
 
-	state, err := readTFState(getStateFilePath())
+	state, err := readTFState(getTerraformStateFilePath())
 
 	if err != nil {
 		return fmtc.Errorf("Can't read state file: %v", err)

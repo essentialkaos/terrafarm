@@ -14,7 +14,10 @@ import (
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
+// DO_API is DO API url
 const DO_API = "https://api.digitalocean.com/v2"
+
+// USER_AGENT is user agent used for all requests
 const USER_AGENT = "terrafarm"
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -53,6 +56,7 @@ type Size struct {
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
+// IsValidToken return true if token valid and account is active
 func IsValidToken(token string) bool {
 	resp, err := doAPIRequest(token, "/account")
 
@@ -71,6 +75,8 @@ func IsValidToken(token string) bool {
 	return accountInfo.Account.Status == "active"
 }
 
+// IsFingerprintValid return tru if provate key with given fingerprint is
+// present in Digital Ocean account
 func IsFingerprintValid(token, fingerprint string) bool {
 	resp, err := doAPIRequest(token, "/account/keys")
 
@@ -95,6 +101,8 @@ func IsFingerprintValid(token, fingerprint string) bool {
 	return false
 }
 
+// IsRegionValid return true if region with given slug is present
+// on Digital Ocean
 func IsRegionValid(token, slug string) bool {
 	resp, err := doAPIRequest(token, "/regions")
 
@@ -119,6 +127,8 @@ func IsRegionValid(token, slug string) bool {
 	return false
 }
 
+// IsSizeValid return true if size with given slug is present
+// on Digital Ocean
 func IsSizeValid(token, slug string) bool {
 	resp, err := doAPIRequest(token, "/sizes")
 
@@ -145,6 +155,7 @@ func IsSizeValid(token, slug string) bool {
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
+// doAPIRequest execute request to DO API
 func doAPIRequest(token, url string) (*req.Response, error) {
 	return req.Request{
 		URL:         DO_API + url,
