@@ -40,6 +40,14 @@ Preferences file must be named as `.terrafarm` and placed in your `HOME` directo
 
 Command-line arguments have higher priority and overwrite properties defined in preferences file.
 
+If you want to use your own Terraform data without modifying original data, you can set path to Terraform data using `TERRADATA` environment variable.
+
+Example:
+
+```bash
+TERRADATA=/home/user/my-own-terrafrom-data terrafarm create
+```
+
 #### Debugging
 
 If you find an bug with Terrafarm, please include the detailed log. As a user, this information can help work around the problem and prepare fixes. 
@@ -69,6 +77,7 @@ Options:
   --node-size, -N size    Droplet size on DigitalOcean
   --user, -U username     Build node user name
   --force, -f             Force command execution
+  --no-validate, -nv      Don't validate preferencies
   --no-color, -nc         Disable colors in output
   --help, -h              Show this help message
   --version, -v           Show version
