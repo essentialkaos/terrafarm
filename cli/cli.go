@@ -26,6 +26,7 @@ import (
 	"pkg.re/essentialkaos/ek.v1/log"
 	"pkg.re/essentialkaos/ek.v1/path"
 	"pkg.re/essentialkaos/ek.v1/signal"
+	"pkg.re/essentialkaos/ek.v1/spellcheck"
 	"pkg.re/essentialkaos/ek.v1/terminal"
 	"pkg.re/essentialkaos/ek.v1/timeutil"
 	"pkg.re/essentialkaos/ek.v1/usage"
@@ -41,7 +42,7 @@ import (
 
 const (
 	APP  = "Terrafarm"
-	VER  = "0.5.0"
+	VER  = "0.5.1"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -65,8 +66,14 @@ const (
 
 const (
 	CMD_CREATE  = "create"
+	CMD_APPLY   = "apply"
+	CMD_START   = "start"
 	CMD_DESTROY = "destroy"
+	CMD_DELETE  = "delete"
+	CMD_STOP    = "stop"
 	CMD_STATUS  = "status"
+	CMD_INFO    = "info"
+	CMD_STATE   = "state"
 )
 
 // TERRAFORM_DATA_DIR is name of dir with terraform data
@@ -284,12 +291,15 @@ func startMonitor() {
 func processCommand(cmd string) {
 	prefs := findAndReadPrefs()
 
+	scm := getSpellcheckModel()
+	cmd = scm.Correct(cmd)
+
 	switch cmd {
-	case CMD_CREATE, "apply", "start":
+	case CMD_CREATE, CMD_APPLY, CMD_START:
 		createCommand(prefs)
-	case CMD_DESTROY, "delete", "stop":
+	case CMD_DESTROY, CMD_DELETE, CMD_STOP:
 		destroyCommand(prefs)
-	case CMD_STATUS, "info", "state":
+	case CMD_STATUS, CMD_INFO, CMD_STATE:
 		statusCommand(prefs)
 	default:
 		fmtc.Printf("{r}Unknown command %s\n", cmd)
@@ -860,6 +870,16 @@ func exportNodeList(prefs *Prefs) error {
 // signalInterceptor is TERM and INT signal handler
 func signalInterceptor() {
 	fmtc.Println("\n{y}You can't cancel command execution in this time{!}")
+}
+
+// getSpellcheckModel return spellcheck model for correcting
+// given command name
+func getSpellcheckModel() *spellcheck.Model {
+	return spellcheck.Train([]string{
+		CMD_CREATE, CMD_APPLY, CMD_START,
+		CMD_DESTROY, CMD_DELETE, CMD_STOP,
+		CMD_STATUS, CMD_INFO, CMD_STATE,
+	})
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
