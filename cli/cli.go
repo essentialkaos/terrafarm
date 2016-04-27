@@ -42,7 +42,7 @@ import (
 
 const (
 	APP  = "Terrafarm"
-	VER  = "0.5.1"
+	VER  = "0.5.2"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -252,6 +252,7 @@ func startMonitor() {
 	for {
 		if !isTerrafarmActive() {
 			log.Info("Farm destroyed manually")
+			os.Remove(stateFile)
 			os.Exit(0)
 		}
 
