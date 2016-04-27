@@ -45,7 +45,7 @@ If you want to use your own Terraform data without modifying original data, you 
 Example:
 
 ```bash
-TERRADATA=/home/user/my-own-terrafrom-data terrafarm create
+TERRADATA=/home/user/my-own-terraform-data terrafarm create
 ```
 
 #### Debugging
