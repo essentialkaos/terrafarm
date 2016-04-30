@@ -2,6 +2,7 @@
 
 `terrafarm` is utility for working with terraform based rpmbuilder farm on [DigitalOcean](https://www.digitalocean.com).
 
+* [Usage Demo](#usage-demo)
 * [Installation](#installation)
 * [Configuration](#configuration)
   * [Preferences file](#preferences-file)
@@ -12,6 +13,10 @@
 * [Build Status](#build-status)
 * [Contributing](#contributing)
 * [License](#license)
+
+#### Usage demo
+
+[![asciicast](https://asciinema.org/a/44185.png)](https://asciinema.org/a/44185)
 
 #### Installation
 
