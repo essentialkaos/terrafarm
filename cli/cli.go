@@ -55,6 +55,7 @@ const (
 	ARG_NODE_SIZE   = "N:node-size"
 	ARG_USER        = "U:user"
 	ARG_PASSWORD    = "P:password"
+	ARG_FARM        = "F:farm"
 	ARG_DEBUG       = "D:debug"
 	ARG_MONITOR     = "m:monitor"
 	ARG_FORCE       = "f:force"
@@ -97,6 +98,9 @@ const MONITOR_LOG_FILE = "monitor.log"
 // DATA_ENV_VAR is name of environment variable with path to data directory
 const DATA_ENV_VAR = "TERRADATA"
 
+// SEPARATOR is separator used for log output
+const SEPARATOR = "----------------------------------------------------------------------------------------"
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 // MonitorState cotains monitor specific info
@@ -122,6 +126,7 @@ var argMap = arg.Map{
 	ARG_REGION:      &arg.V{Value: "ams3"},
 	ARG_NODE_SIZE:   &arg.V{Value: "16gb"},
 	ARG_USER:        &arg.V{Value: "builder"},
+	ARG_FARM:        &arg.V{Value: "c6-multiarch"},
 	ARG_DEBUG:       &arg.V{Type: arg.BOOL},
 	ARG_MONITOR:     &arg.V{Type: arg.INT},
 	ARG_FORCE:       &arg.V{Type: arg.BOOL},
@@ -246,6 +251,7 @@ func startMonitor() {
 	}
 
 	log.Set(getMonitorLogFilePath(), 0644)
+	log.Aux(SEPARATOR)
 	log.Aux("Terrafarm %s monitor started", VER)
 	log.Info("Farm will be destroyed after %s", timeutil.Format(destroyAfter, "%Y/%m/%d %H:%M:%S"))
 
@@ -265,13 +271,13 @@ func startMonitor() {
 		log.Info("Starting farm destroying...")
 
 		prefs := findAndReadPrefs()
-		vars, err := prefsToArgs(prefs)
+		vars, err := prefsToArgs(prefs, "-no-color", "-force")
 
 		if err != nil {
 			continue
 		}
 
-		vars = append(vars, "-force")
+		fsutil.Push(path.Join(getDataDir(), prefs.Farm))
 
 		err = execTerraform(true, "destroy", vars)
 
@@ -279,6 +285,8 @@ func startMonitor() {
 			log.Error("Can't destroy farm - terrafarm return error: %v", err)
 			continue
 		}
+
+		fsutil.Pop()
 
 		os.Remove(getFarmStateFilePath())
 
@@ -341,12 +349,16 @@ func createCommand(prefs *Prefs) {
 		fmtc.Printf("{s}EXEC → terraform apply %s{!}\n\n", strings.Join(vars, " "))
 	}
 
+	fsutil.Push(path.Join(getDataDir(), prefs.Farm))
+
 	err = execTerraform(false, "apply", vars)
 
 	if err != nil {
 		fmtc.Printf("{r}Error while executing terraform: %v\n{!}", err)
 		os.Exit(1)
 	}
+
+	fsutil.Pop()
 
 	fmtutil.Separator(false)
 
@@ -413,6 +425,7 @@ func statusCommand(prefs *Prefs) {
 
 	fmtutil.Separator(false, "TERRAFARM")
 
+	fmtc.Printf("  {*}%-16s{!} %s\n", "Farm:", prefs.Farm)
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
 
 	printValidationMarker(tokenValid, disableValidate)
@@ -496,7 +509,7 @@ func destroyCommand(prefs *Prefs) {
 
 	fmtutil.Separator(false)
 
-	vars, err := prefsToArgs(prefs)
+	vars, err := prefsToArgs(prefs, "-force")
 
 	if err != nil {
 		printError("Can't parse prefs: %v", err)
@@ -505,11 +518,11 @@ func destroyCommand(prefs *Prefs) {
 
 	addSignalInterception()
 
-	vars = append(vars, "-force")
-
 	if arg.GetB(ARG_DEBUG) {
 		fmtc.Printf("{s}EXEC → terraform destroy %s{!}\n\n", strings.Join(vars, " "))
 	}
+
+	fsutil.Push(path.Join(getDataDir(), prefs.Farm))
 
 	err = execTerraform(false, "destroy", vars)
 
@@ -517,6 +530,8 @@ func destroyCommand(prefs *Prefs) {
 		fmtc.Printf("{r}Error while executing terraform: %v\n{!}", err)
 		os.Exit(1)
 	}
+
+	fsutil.Pop()
 
 	fmtutil.Separator(false)
 
@@ -594,7 +609,7 @@ func getCryptedToken(token string) string {
 }
 
 // prefsToArgs return prefs as command line arguments for terraform
-func prefsToArgs(prefs *Prefs) ([]string, error) {
+func prefsToArgs(prefs *Prefs, args ...string) ([]string, error) {
 	auth, err := getPasswordHash(prefs.Password)
 
 	if err != nil {
@@ -624,13 +639,17 @@ func prefsToArgs(prefs *Prefs) ([]string, error) {
 		vars = append(vars, fmtc.Sprintf("-var node_size=%s", prefs.NodeSize))
 	}
 
+	vars = append(vars, fmtc.Sprintf("-state=%s", getTerraformStateFilePath()))
+
+	if len(args) != 0 {
+		vars = append(vars, args...)
+	}
+
 	return vars, nil
 }
 
 // exec execute command
 func execTerraform(logOutput bool, command string, args []string) error {
-	fsutil.Push(getDataDir())
-
 	cmd := exec.Command("terraform", command)
 
 	if len(args) != 0 {
@@ -666,8 +685,6 @@ func execTerraform(logOutput bool, command string, args []string) error {
 	if err != nil {
 		return fmtc.Errorf("Can't process terraform output: %v", err)
 	}
-
-	fsutil.Pop()
 
 	return nil
 }
@@ -760,7 +777,7 @@ func getFarmStateFilePath() string {
 
 // getMonitorLogFilePath return path to monitor log file
 func getMonitorLogFilePath() string {
-	return path.Join(getSrcDir(), MONITOR_LOG_FILE)
+	return path.Join(getDataDir(), MONITOR_LOG_FILE)
 }
 
 // getMonitorStateFilePath return path to monitor state file
@@ -907,6 +924,7 @@ func showUsage() {
 
 	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "ttl")
 	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
+	info.AddOption(ARG_FARM, "Farm template", "template")
 	info.AddOption(ARG_TOKEN, "DigitalOcean token", "token")
 	info.AddOption(ARG_KEY, "Path to private key", "key-file")
 	info.AddOption(ARG_REGION, "DigitalOcean region", "region")

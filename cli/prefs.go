@@ -29,6 +29,7 @@ type Prefs struct {
 	NodeSize string
 	User     string
 	Password string
+	Farm     string
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -104,6 +105,9 @@ func applyPrefsFromFile(prefs *Prefs, file string) {
 		case "user":
 			prefs.User = propVal
 
+		case "farm":
+			prefs.Farm = propVal
+
 		default:
 			printWarn("Unknown property %s in %s file", propName, file)
 		}
@@ -120,32 +124,36 @@ func applyPrefsFromArgs(prefs *Prefs) {
 		}
 	}
 
-	if arg.Has(ARG_OUTPUT) {
+	if arg.GetS(ARG_OUTPUT) != "" {
 		prefs.Output = arg.GetS(ARG_OUTPUT)
 	}
 
-	if arg.Has(ARG_TOKEN) {
+	if arg.GetS(ARG_TOKEN) != "" {
 		prefs.Token = arg.GetS(ARG_TOKEN)
 	}
 
-	if arg.Has(ARG_KEY) {
+	if arg.GetS(ARG_KEY) != "" {
 		prefs.Key = arg.GetS(ARG_KEY)
 	}
 
-	if arg.Has(ARG_REGION) {
+	if arg.GetS(ARG_REGION) != "" {
 		prefs.Region = arg.GetS(ARG_REGION)
 	}
 
-	if arg.Has(ARG_NODE_SIZE) {
+	if arg.GetS(ARG_NODE_SIZE) != "" {
 		prefs.NodeSize = arg.GetS(ARG_NODE_SIZE)
 	}
 
-	if arg.Has(ARG_USER) {
+	if arg.GetS(ARG_USER) != "" {
 		prefs.User = arg.GetS(ARG_USER)
 	}
 
-	if arg.Has(ARG_PASSWORD) {
+	if arg.GetS(ARG_PASSWORD) != "" {
 		prefs.Password = arg.GetS(ARG_PASSWORD)
+	}
+
+	if arg.GetS(ARG_FARM) != "" {
+		prefs.Farm = arg.GetS(ARG_FARM)
 	}
 }
 
@@ -180,6 +188,7 @@ func parseTTL(ttl string) int64 {
 	return ttlVal * mult
 }
 
+// validatePrefs validate basic preferencies
 func validatePrefs(prefs *Prefs) {
 	hasErrors := false
 
@@ -234,6 +243,28 @@ func validatePrefs(prefs *Prefs) {
 
 		if !fsutil.IsNonEmpty(prefs.Key + ".pub") {
 			printError("Public key file %s.pub does not contain any data", prefs.Key)
+			hasErrors = true
+		}
+	}
+
+	farmDataDir := getDataDir() + "/" + prefs.Farm
+
+	if !fsutil.IsExist(farmDataDir) {
+		printError("Directory with farm data %s is not exist", farmDataDir)
+		hasErrors = true
+	} else {
+		if !fsutil.IsReadable(farmDataDir) {
+			printError("Directory with farm data %s is not readable", farmDataDir)
+			hasErrors = true
+		}
+
+		if fsutil.IsDir(farmDataDir) {
+			if fsutil.IsEmptyDir(farmDataDir) {
+				printError("Directory with farm data %s is empty", farmDataDir)
+				hasErrors = true
+			}
+		} else {
+			printError("Target %s is not a directory", farmDataDir)
 			hasErrors = true
 		}
 	}

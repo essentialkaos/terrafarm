@@ -18,7 +18,11 @@ go get -u github.com/essentialkaos/terrafarm
 
 #### Configuration
 
-`terrafarm` use two ways for farm preconfiguration — preferences file and command-line arguments. Preferences file use next format:
+`terrafarm` have two ways for farm preconfiguration — preferences file and command-line arguments.
+
+##### Preferences file
+
+Preferences file use next format:
 
 ```yaml
 prop-name: prop-value
@@ -71,6 +75,7 @@ Options:
 
   --ttl, -t ttl           Max farm TTL (Time To Live)
   --output, -o file       Path to output file with access credentials
+  --farm, -F template     Farm template
   --token, -T token       DigitalOcean token
   --key, -K key-file      Path to private key
   --region, -R region     DigitalOcean region
