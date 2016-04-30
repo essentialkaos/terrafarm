@@ -68,12 +68,13 @@ You can define or redefine properties using next variables:
 * `TERRAFARM_DATA` - Path to directory with your own Terraform data
 * `TERRAFARM_TTL` - Max farm TTL (Time To Live)
 * `TERRAFARM_OUTPUT` - Path to output file with access credentials
-* `TERRAFARM_FARM` - Farm template
+* `TERRAFARM_TEMPLATE` - Farm template name
 * `TERRAFARM_TOKEN` - DigitalOcean token
 * `TERRAFARM_KEY` - Droplet size on DigitalOcean
 * `TERRAFARM_REGION` - DigitalOcean region
 * `TERRAFARM_NODE_SIZE` - Droplet size on DigitalOcean
 * `TERRAFARM_USER` - Build node user name
+* `TERRAFARM_PASSWORD` - Build node user password
 
 Example:
 
@@ -108,19 +109,20 @@ Commands:
 
 Options:
 
-  --ttl, -t ttl           Max farm TTL (Time To Live)
-  --output, -o file       Path to output file with access credentials
-  --farm, -F template     Farm template name
-  --token, -T token       DigitalOcean token
-  --key, -K key-file      Path to private key
-  --region, -R region     DigitalOcean region
-  --node-size, -N size    Droplet size on DigitalOcean
-  --user, -U username     Build node user name
-  --force, -f             Force command execution
-  --no-validate, -nv      Don't validate preferences
-  --no-color, -nc         Disable colors in output
-  --help, -h              Show this help message
-  --version, -v           Show version
+  --ttl, -t ttl              Max farm TTL (Time To Live)
+  --output, -o file          Path to output file with access credentials
+  --template, -L name        Farm template name
+  --token, -T token          DigitalOcean token
+  --key, -K key-file         Path to private key
+  --region, -R region        DigitalOcean region
+  --node-size, -N size       Droplet size on DigitalOcean
+  --user, -U username        Build node user name
+  --password, -P password    Build node user password
+  --force, -f                Force command execution
+  --no-validate, -nv         Don't validate preferences
+  --no-color, -nc            Disable colors in output
+  --help, -h                 Show this help message
+  --version, -v              Show version
 
 Examples:
 

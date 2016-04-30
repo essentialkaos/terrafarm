@@ -40,12 +40,14 @@ import (
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
+// App info
 const (
 	APP  = "Terrafarm"
 	VER  = "0.6.0"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
+// List of supported command-line arguments
 const (
 	ARG_TTL         = "t:ttl"
 	ARG_OUTPUT      = "o:output"
@@ -55,7 +57,7 @@ const (
 	ARG_NODE_SIZE   = "N:node-size"
 	ARG_USER        = "U:user"
 	ARG_PASSWORD    = "P:password"
-	ARG_FARM        = "F:farm"
+	ARG_TEMPLATE    = "L:template"
 	ARG_DEBUG       = "D:debug"
 	ARG_MONITOR     = "m:monitor"
 	ARG_FORCE       = "f:force"
@@ -65,6 +67,7 @@ const (
 	ARG_VER         = "v:version"
 )
 
+// List of supported commands
 const (
 	CMD_CREATE  = "create"
 	CMD_APPLY   = "apply"
@@ -75,6 +78,20 @@ const (
 	CMD_STATUS  = "status"
 	CMD_INFO    = "info"
 	CMD_STATE   = "state"
+)
+
+// List of supported environment variables
+const (
+	EV_DATA      = "TERRAFARM_DATA"
+	EV_TTL       = "TERRAFARM_TTL"
+	EV_OUTPUT    = "TERRAFARM_OUTPUT"
+	EV_TEMPLATE  = "TERRAFARM_TEMPLATE"
+	EV_TOKEN     = "TERRAFARM_TOKEN"
+	EV_KEY       = "TERRAFARM_KEY"
+	EV_REGION    = "TERRAFARM_REGION"
+	EV_NODE_SIZE = "TERRAFARM_NODE_SIZE"
+	EV_USER      = "TERRAFARM_USER"
+	EV_PASSWORD  = "TERRAFARM_PASSWORD"
 )
 
 // TERRAFORM_DATA_DIR is name of directory with terraform data
@@ -94,9 +111,6 @@ const FARM_STATE_FILE = ".farm-state"
 
 // MONITOR_LOG_FILE is name of monitor log file
 const MONITOR_LOG_FILE = "monitor.log"
-
-// DATA_ENV_VAR is name of environment variable with path to data directory
-const DATA_ENV_VAR = "TERRADATA"
 
 // SEPARATOR is separator used for log output
 const SEPARATOR = "----------------------------------------------------------------------------------------"
@@ -119,14 +133,14 @@ type FarmState struct {
 
 // argMap is map with supported command-line arguments
 var argMap = arg.Map{
-	ARG_TTL:         &arg.V{Value: "2h"},
+	ARG_TTL:         &arg.V{},
 	ARG_OUTPUT:      &arg.V{},
 	ARG_TOKEN:       &arg.V{},
 	ARG_KEY:         &arg.V{},
-	ARG_REGION:      &arg.V{Value: "ams3"},
-	ARG_NODE_SIZE:   &arg.V{Value: "16gb"},
-	ARG_USER:        &arg.V{Value: "builder"},
-	ARG_FARM:        &arg.V{Value: "c6-multiarch"},
+	ARG_REGION:      &arg.V{},
+	ARG_NODE_SIZE:   &arg.V{},
+	ARG_USER:        &arg.V{},
+	ARG_TEMPLATE:    &arg.V{},
 	ARG_DEBUG:       &arg.V{Type: arg.BOOL},
 	ARG_MONITOR:     &arg.V{Type: arg.INT},
 	ARG_FORCE:       &arg.V{Type: arg.BOOL},
@@ -277,7 +291,7 @@ func startMonitor() {
 			continue
 		}
 
-		fsutil.Push(path.Join(getDataDir(), prefs.Farm))
+		fsutil.Push(path.Join(getDataDir(), prefs.Template))
 
 		err = execTerraform(true, "destroy", vars)
 
@@ -349,7 +363,7 @@ func createCommand(prefs *Preferences) {
 		fmtc.Printf("{s}EXEC → terraform apply %s{!}\n\n", strings.Join(vars, " "))
 	}
 
-	fsutil.Push(path.Join(getDataDir(), prefs.Farm))
+	fsutil.Push(path.Join(getDataDir(), prefs.Template))
 
 	err = execTerraform(false, "apply", vars)
 
@@ -425,7 +439,7 @@ func statusCommand(prefs *Preferences) {
 
 	fmtutil.Separator(false, "TERRAFARM")
 
-	fmtc.Printf("  {*}%-16s{!} %s\n", "Farm:", prefs.Farm)
+	fmtc.Printf("  {*}%-16s{!} %s\n", "Template:", prefs.Template)
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
 
 	printValidationMarker(tokenValid, disableValidate)
@@ -522,7 +536,7 @@ func destroyCommand(prefs *Preferences) {
 		fmtc.Printf("{s}EXEC → terraform destroy %s{!}\n\n", strings.Join(vars, " "))
 	}
 
-	fsutil.Push(path.Join(getDataDir(), prefs.Farm))
+	fsutil.Push(path.Join(getDataDir(), prefs.Template))
 
 	err = execTerraform(false, "destroy", vars)
 
@@ -753,8 +767,8 @@ func isMonitorActive() bool {
 
 // getDataDir return path to directory with terraform data
 func getDataDir() string {
-	if envMap[DATA_ENV_VAR] != "" {
-		return envMap[DATA_ENV_VAR]
+	if envMap[EV_DATA] != "" {
+		return envMap[EV_DATA]
 	}
 
 	return path.Join(getSrcDir(), TERRAFORM_DATA_DIR)
@@ -924,12 +938,13 @@ func showUsage() {
 
 	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "ttl")
 	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
-	info.AddOption(ARG_FARM, "Farm template name", "template")
+	info.AddOption(ARG_TEMPLATE, "Farm template name", "name")
 	info.AddOption(ARG_TOKEN, "DigitalOcean token", "token")
 	info.AddOption(ARG_KEY, "Path to private key", "key-file")
 	info.AddOption(ARG_REGION, "DigitalOcean region", "region")
 	info.AddOption(ARG_NODE_SIZE, "Droplet size on DigitalOcean", "size")
 	info.AddOption(ARG_USER, "Build node user name", "username")
+	info.AddOption(ARG_PASSWORD, "Build node user password", "password")
 	info.AddOption(ARG_FORCE, "Force command execution")
 	info.AddOption(ARG_NO_VALIDATE, "Don't validate preferences")
 	info.AddOption(ARG_NO_COLOR, "Disable colors in output")

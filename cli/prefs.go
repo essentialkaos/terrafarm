@@ -30,7 +30,7 @@ type Preferences struct {
 	NodeSize string
 	User     string
 	Password string
-	Farm     string
+	Template string
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -38,7 +38,12 @@ type Preferences struct {
 // findAndReadPreferences read preferences from file and command-line arguments
 func findAndReadPreferences() *Preferences {
 	prefs := &Preferences{
+		TTL:      240,
+		Region:   "ams3",
+		NodeSize: "16gb",
+		User:     "builder",
 		Password: crypto.GenPassword(18, crypto.STRENGTH_MEDIUM),
+		Template: "c6-multiarch",
 	}
 
 	prefsFile := fsutil.ProperPath("FRS", []string{
@@ -50,6 +55,7 @@ func findAndReadPreferences() *Preferences {
 		applyPreferencesFromFile(prefs, prefsFile)
 	}
 
+	applyPreferencesFromEnvironment(prefs)
 	applyPreferencesFromArgs(prefs)
 	validatePreferences(prefs)
 
@@ -106,8 +112,8 @@ func applyPreferencesFromFile(prefs *Preferences, file string) {
 		case "user":
 			prefs.User = propVal
 
-		case "farm":
-			prefs.Farm = propVal
+		case "template":
+			prefs.Template = propVal
 
 		default:
 			printWarn("Unknown property %s in %s file", propName, file)
@@ -125,36 +131,78 @@ func applyPreferencesFromArgs(prefs *Preferences) {
 		}
 	}
 
-	if arg.GetS(ARG_OUTPUT) != "" {
+	if arg.Has(ARG_OUTPUT) {
 		prefs.Output = arg.GetS(ARG_OUTPUT)
 	}
 
-	if arg.GetS(ARG_TOKEN) != "" {
+	if arg.Has(ARG_TOKEN) {
 		prefs.Token = arg.GetS(ARG_TOKEN)
 	}
 
-	if arg.GetS(ARG_KEY) != "" {
+	if arg.Has(ARG_KEY) {
 		prefs.Key = arg.GetS(ARG_KEY)
 	}
 
-	if arg.GetS(ARG_REGION) != "" {
+	if arg.Has(ARG_REGION) {
 		prefs.Region = arg.GetS(ARG_REGION)
 	}
 
-	if arg.GetS(ARG_NODE_SIZE) != "" {
+	if arg.Has(ARG_NODE_SIZE) {
 		prefs.NodeSize = arg.GetS(ARG_NODE_SIZE)
 	}
 
-	if arg.GetS(ARG_USER) != "" {
+	if arg.Has(ARG_USER) {
 		prefs.User = arg.GetS(ARG_USER)
 	}
 
-	if arg.GetS(ARG_PASSWORD) != "" {
+	if arg.Has(ARG_PASSWORD) {
 		prefs.Password = arg.GetS(ARG_PASSWORD)
 	}
 
-	if arg.GetS(ARG_FARM) != "" {
-		prefs.Farm = arg.GetS(ARG_FARM)
+	if arg.Has(ARG_TEMPLATE) {
+		prefs.Template = arg.GetS(ARG_TEMPLATE)
+	}
+}
+
+func applyPreferencesFromEnvironment(prefs *Preferences) {
+	if envMap[EV_TTL] != "" {
+		prefs.TTL = parseTTL(envMap[EV_TTL])
+
+		if prefs.TTL == -1 {
+			printError("Can't parse ttl property from environment variables")
+		}
+	}
+
+	if envMap[EV_OUTPUT] != "" {
+		prefs.Output = envMap[EV_OUTPUT]
+	}
+
+	if envMap[EV_TOKEN] != "" {
+		prefs.Token = envMap[EV_TOKEN]
+	}
+
+	if envMap[EV_KEY] != "" {
+		prefs.Key = envMap[EV_KEY]
+	}
+
+	if envMap[EV_REGION] != "" {
+		prefs.Region = envMap[EV_REGION]
+	}
+
+	if envMap[EV_NODE_SIZE] != "" {
+		prefs.NodeSize = envMap[EV_NODE_SIZE]
+	}
+
+	if envMap[EV_USER] != "" {
+		prefs.User = envMap[EV_USER]
+	}
+
+	if envMap[EV_PASSWORD] != "" {
+		prefs.Password = envMap[EV_PASSWORD]
+	}
+
+	if envMap[EV_TEMPLATE] != "" {
+		prefs.Template = envMap[EV_TEMPLATE]
 	}
 }
 
@@ -248,24 +296,24 @@ func validatePreferences(prefs *Preferences) {
 		}
 	}
 
-	farmDataDir := getDataDir() + "/" + prefs.Farm
+	templateDir := getDataDir() + "/" + prefs.Template
 
-	if !fsutil.IsExist(farmDataDir) {
-		printError("Directory with farm data %s is not exist", farmDataDir)
+	if !fsutil.IsExist(templateDir) {
+		printError("Directory with farm data %s is not exist", templateDir)
 		hasErrors = true
 	} else {
-		if !fsutil.IsReadable(farmDataDir) {
-			printError("Directory with farm data %s is not readable", farmDataDir)
+		if !fsutil.IsReadable(templateDir) {
+			printError("Directory with farm data %s is not readable", templateDir)
 			hasErrors = true
 		}
 
-		if fsutil.IsDir(farmDataDir) {
-			if fsutil.IsEmptyDir(farmDataDir) {
-				printError("Directory with farm data %s is empty", farmDataDir)
+		if fsutil.IsDir(templateDir) {
+			if fsutil.IsEmptyDir(templateDir) {
+				printError("Directory with farm data %s is empty", templateDir)
 				hasErrors = true
 			}
 		} else {
-			printError("Target %s is not a directory", farmDataDir)
+			printError("Target %s is not a directory", templateDir)
 			hasErrors = true
 		}
 	}
