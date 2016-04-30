@@ -15,7 +15,6 @@ import (
 
 	"pkg.re/essentialkaos/ek.v1/arg"
 	"pkg.re/essentialkaos/ek.v1/crypto"
-	"pkg.re/essentialkaos/ek.v1/fmtc"
 	"pkg.re/essentialkaos/ek.v1/fsutil"
 )
 
@@ -37,10 +36,6 @@ type Prefs struct {
 // findAndReadPrefs read prefs from file and command-line arguments
 func findAndReadPrefs() *Prefs {
 	prefs := &Prefs{
-		Region:   "fra1",
-		NodeSize: "16gb",
-		TTL:      240,
-		User:     "builder",
 		Password: crypto.GenPassword(18, crypto.STRENGTH_MEDIUM),
 	}
 
@@ -88,7 +83,7 @@ func applyPrefsFromFile(prefs *Prefs, file string) {
 			prefs.TTL = parseTTL(propVal)
 
 			if prefs.TTL == -1 {
-				fmtc.Printf("{r}Can't parse ttl property in %s file{!}\n", file)
+				printError("Can't parse ttl property in %s file", file)
 			}
 
 		case "output":
@@ -110,7 +105,7 @@ func applyPrefsFromFile(prefs *Prefs, file string) {
 			prefs.User = propVal
 
 		default:
-			fmtc.Printf("{y}Unknown property %s in %s file{!}\n", propName, file)
+			printWarn("Unknown property %s in %s file", propName, file)
 		}
 	}
 }
@@ -121,7 +116,7 @@ func applyPrefsFromArgs(prefs *Prefs) {
 		prefs.TTL = parseTTL(arg.GetS(ARG_TTL))
 
 		if prefs.TTL == -1 {
-			fmtc.Println("{r}Can't parse ttl property from command-line arguments{!}")
+			printError("Can't parse ttl property from command-line arguments")
 		}
 	}
 
@@ -189,56 +184,56 @@ func validatePrefs(prefs *Prefs) {
 	hasErrors := false
 
 	if prefs.Token == "" {
-		fmtc.Println("{r}Property token must be set{!}")
+		printError("Property token must be set")
 		hasErrors = true
 	}
 
 	if prefs.Region == "" {
-		fmtc.Println("{r}Property region must be set{!}")
+		printError("Property region must be set")
 		hasErrors = true
 	}
 
 	if prefs.NodeSize == "" {
-		fmtc.Println("{r}Property node-size must be set{!}")
+		printError("Property node-size must be set")
 		hasErrors = true
 	}
 
 	if prefs.User == "" {
-		fmtc.Println("{r}Property user must be set{!}")
+		printError("Property user must be set")
 		hasErrors = true
 	}
 
 	if prefs.Key == "" {
-		fmtc.Println("{r}Property key must be set{!}")
+		printError("Property key must be set")
 		hasErrors = true
 	} else {
 		if !fsutil.IsExist(prefs.Key) {
-			fmtc.Printf("{r}Private key file %s does not exits{!}\n", prefs.Key)
+			printError("Private key file %s does not exits", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsReadable(prefs.Key) {
-			fmtc.Printf("{r}Private key file %s must be readable{!}\n", prefs.Key)
+			printError("Private key file %s must be readable", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsNonEmpty(prefs.Key) {
-			fmtc.Printf("{r}Private key file %s does not contain any data{!}\n", prefs.Key)
+			printError("Private key file %s does not contain any data", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsExist(prefs.Key + ".pub") {
-			fmtc.Printf("{r}Public key file %s.pub does not exits{!}\n", prefs.Key)
+			printError("Public key file %s.pub does not exits", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsReadable(prefs.Key + ".pub") {
-			fmtc.Printf("{r}Public key file %s.pub must be readable{!}\n", prefs.Key)
+			printError("Public key file %s.pub must be readable", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsNonEmpty(prefs.Key + ".pub") {
-			fmtc.Printf("{r}Public key file %s.pub does not contain any data{!}\n", prefs.Key)
+			printError("Public key file %s.pub does not contain any data", prefs.Key)
 			hasErrors = true
 		}
 	}

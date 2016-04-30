@@ -42,7 +42,7 @@ import (
 
 const (
 	APP  = "Terrafarm"
-	VER  = "0.5.2"
+	VER  = "0.6.0"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -115,13 +115,13 @@ type FarmState struct {
 
 // argMap is map with supported command-line arguments
 var argMap = arg.Map{
-	ARG_TTL:         &arg.V{},
+	ARG_TTL:         &arg.V{Value: "2h"},
 	ARG_OUTPUT:      &arg.V{},
 	ARG_TOKEN:       &arg.V{},
 	ARG_KEY:         &arg.V{},
-	ARG_REGION:      &arg.V{},
-	ARG_NODE_SIZE:   &arg.V{},
-	ARG_USER:        &arg.V{},
+	ARG_REGION:      &arg.V{Value: "ams3"},
+	ARG_NODE_SIZE:   &arg.V{Value: "16gb"},
+	ARG_USER:        &arg.V{Value: "builder"},
 	ARG_DEBUG:       &arg.V{Type: arg.BOOL},
 	ARG_MONITOR:     &arg.V{Type: arg.INT},
 	ARG_FORCE:       &arg.V{Type: arg.BOOL},
@@ -153,7 +153,7 @@ func Init() {
 		fmtc.NewLine()
 
 		for _, err := range errs {
-			fmtc.Printf("{r}%v{!}\n", err)
+			printError(err.Error())
 		}
 
 		os.Exit(1)
@@ -192,21 +192,21 @@ func Init() {
 // checkEnv check system environment
 func checkEnv() {
 	if envMap["GOPATH"] == "" {
-		fmtc.Println("{r}GOPATH must be set to valid path{!}")
+		printError("GOPATH must be set to valid path")
 		os.Exit(1)
 	}
 
 	srcDir := getSrcDir()
 
 	if !fsutil.CheckPerms("DRW", srcDir) {
-		fmtc.Printf("{r}Source directory %s is not accessible{!}\n", srcDir)
+		printError("Source directory %s is not accessible", srcDir)
 		os.Exit(1)
 	}
 
 	dataDir := getDataDir()
 
 	if !fsutil.CheckPerms("DRW", dataDir) {
-		fmtc.Printf("{r}Data directory %s is not accessible{!}\n", dataDir)
+		printError("Data directory %s is not accessible", dataDir)
 		os.Exit(1)
 	}
 }
@@ -217,7 +217,7 @@ func checkDeps() {
 
 	for _, dep := range depList {
 		if env.Which(dep) == "" {
-			fmtc.Printf("{r}Can't find %s. Please install it first.{!}\n", dep)
+			printError("Can't find %s. Please install it first.", dep)
 			hasErrors = true
 		}
 	}
@@ -280,6 +280,8 @@ func startMonitor() {
 			continue
 		}
 
+		os.Remove(getFarmStateFilePath())
+
 		break
 	}
 
@@ -311,7 +313,7 @@ func processCommand(cmd string) {
 // createCommand is create command handler
 func createCommand(prefs *Prefs) {
 	if isTerrafarmActive() {
-		fmtc.Println("{y}Terrafarm already works{!}")
+		printWarn("Terrafarm already works")
 		os.Exit(1)
 	}
 
@@ -329,7 +331,7 @@ func createCommand(prefs *Prefs) {
 	vars, err := prefsToArgs(prefs)
 
 	if err != nil {
-		fmtc.Printf("{r}Can't parse prefs: %v{!}\n", err)
+		printError("Can't parse prefs: %v", err)
 		os.Exit(1)
 	}
 
@@ -497,7 +499,7 @@ func destroyCommand(prefs *Prefs) {
 	vars, err := prefsToArgs(prefs)
 
 	if err != nil {
-		fmtc.Printf("{r}Can't parse prefs: %v{!}\n", err)
+		printError("Can't parse prefs: %v", err)
 		os.Exit(1)
 	}
 
@@ -870,7 +872,7 @@ func exportNodeList(prefs *Prefs) error {
 
 // signalInterceptor is TERM and INT signal handler
 func signalInterceptor() {
-	fmtc.Println("\n{y}You can't cancel command execution in this time{!}")
+	printWarn("\nYou can't cancel command execution in this time")
 }
 
 // getSpellcheckModel return spellcheck model for correcting
@@ -881,6 +883,16 @@ func getSpellcheckModel() *spellcheck.Model {
 		CMD_DESTROY, CMD_DELETE, CMD_STOP,
 		CMD_STATUS, CMD_INFO, CMD_STATE,
 	})
+}
+
+// printError prints error message to console
+func printError(f string, a ...interface{}) {
+	fmtc.Printf("{r}"+f+"{!}\n", a...)
+}
+
+// printError prints warning message to console
+func printWarn(f string, a ...interface{}) {
+	fmtc.Printf("{y}"+f+"{!}\n", a...)
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
