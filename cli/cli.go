@@ -77,7 +77,7 @@ const (
 	CMD_STATE   = "state"
 )
 
-// TERRAFORM_DATA_DIR is name of dir with terraform data
+// TERRAFORM_DATA_DIR is name of directory with terraform data
 const TERRAFORM_DATA_DIR = "terradata"
 
 // TERRAFORM_STATE_FILE is name terraform state file name
@@ -103,7 +103,7 @@ const SEPARATOR = "-------------------------------------------------------------
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
-// MonitorState cotains monitor specific info
+// MonitorState contains monitor specific info
 type MonitorState struct {
 	Pid          int   `json:"pid"`
 	DestroyAfter int64 `json:"destroy_after"`
@@ -111,8 +111,8 @@ type MonitorState struct {
 
 // FarmState contains farm specific info
 type FarmState struct {
-	Prefs       *Prefs `json:"prefs"`
-	Fingerprint string `json:"fingerprint"`
+	Preferences *Preferences `json:"preferences"`
+	Fingerprint string       `json:"fingerprint"`
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -216,7 +216,7 @@ func checkEnv() {
 	}
 }
 
-// checkDeps check required dependecies
+// checkDeps check required dependencies
 func checkDeps() {
 	hasErrors := false
 
@@ -270,7 +270,7 @@ func startMonitor() {
 
 		log.Info("Starting farm destroying...")
 
-		prefs := findAndReadPrefs()
+		prefs := findAndReadPreferences()
 		vars, err := prefsToArgs(prefs, "-no-color", "-force")
 
 		if err != nil {
@@ -300,7 +300,7 @@ func startMonitor() {
 
 // processCommand execute some command
 func processCommand(cmd string) {
-	prefs := findAndReadPrefs()
+	prefs := findAndReadPreferences()
 
 	scm := getSpellcheckModel()
 	cmd = scm.Correct(cmd)
@@ -319,7 +319,7 @@ func processCommand(cmd string) {
 }
 
 // createCommand is create command handler
-func createCommand(prefs *Prefs) {
+func createCommand(prefs *Preferences) {
 	if isTerrafarmActive() {
 		printWarn("Terrafarm already works")
 		os.Exit(1)
@@ -328,7 +328,7 @@ func createCommand(prefs *Prefs) {
 	statusCommand(prefs)
 
 	if !arg.GetB(ARG_FORCE) {
-		if !terminal.ReadAnswer("Create farm with this preferencies? (y/N)", "n") {
+		if !terminal.ReadAnswer("Create farm with this preferences? (y/N)", "n") {
 			fmtc.NewLine()
 			return
 		}
@@ -339,7 +339,7 @@ func createCommand(prefs *Prefs) {
 	vars, err := prefsToArgs(prefs)
 
 	if err != nil {
-		printError("Can't parse prefs: %v", err)
+		printError("Can't parse preferences: %v", err)
 		os.Exit(1)
 	}
 
@@ -386,7 +386,7 @@ func createCommand(prefs *Prefs) {
 			os.Exit(1)
 		}
 
-		fmtc.Println("{g}Monitoring process succefully started!{!}")
+		fmtc.Println("{g}Monitoring process successfully started!{!}")
 
 		fmtutil.Separator(false)
 	}
@@ -395,7 +395,7 @@ func createCommand(prefs *Prefs) {
 }
 
 // statusCommand is status command handler
-func statusCommand(prefs *Prefs) {
+func statusCommand(prefs *Preferences) {
 	var (
 		tokenValid       bool
 		fingerprintValid bool
@@ -411,7 +411,7 @@ func statusCommand(prefs *Prefs) {
 
 		if err == nil {
 			disableValidate = true
-			prefs = farmState.Prefs
+			prefs = farmState.Preferences
 			fingerprint = farmState.Fingerprint
 		}
 	}
@@ -493,7 +493,7 @@ func statusCommand(prefs *Prefs) {
 }
 
 // destroyCommand is destroy command handler
-func destroyCommand(prefs *Prefs) {
+func destroyCommand(prefs *Preferences) {
 	if !isTerrafarmActive() {
 		fmtc.Println("{y}Terrafarm does not works, nothing to destroy{!}")
 		os.Exit(1)
@@ -539,15 +539,15 @@ func destroyCommand(prefs *Prefs) {
 }
 
 // saveFarmState collect and save farm state into file
-func saveState(prefs *Prefs) {
+func saveState(prefs *Preferences) {
 	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
 
 	farmState := &FarmState{
-		Prefs:       prefs,
+		Preferences: prefs,
 		Fingerprint: fingerprint,
 	}
 
-	farmState.Prefs.Token = getCryptedToken(prefs.Token)
+	farmState.Preferences.Token = getCryptedToken(prefs.Token)
 
 	err := saveFarmState(getFarmStateFilePath(), farmState)
 
@@ -608,8 +608,8 @@ func getCryptedToken(token string) string {
 	return token[:8] + "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" + token[56:]
 }
 
-// prefsToArgs return prefs as command line arguments for terraform
-func prefsToArgs(prefs *Prefs, args ...string) ([]string, error) {
+// prefsToArgs return preferences as command line arguments for terraform
+func prefsToArgs(prefs *Preferences, args ...string) ([]string, error) {
 	auth, err := getPasswordHash(prefs.Password)
 
 	if err != nil {
@@ -831,7 +831,7 @@ func runMonitor(ttl int64) error {
 }
 
 // exportNodeList exports info about nodes for usage in rpmbuilder
-func exportNodeList(prefs *Prefs) error {
+func exportNodeList(prefs *Preferences) error {
 	if fsutil.IsExist(prefs.Output) {
 		if fsutil.IsDir(prefs.Output) {
 			return fmtc.Errorf("Output path must be path to file")
@@ -920,25 +920,25 @@ func showUsage() {
 
 	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean")
 	info.AddCommand(CMD_DESTROY, "Destroy farm droplets on DigitalOcean")
-	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferencies and status")
+	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferences and status")
 
 	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "ttl")
 	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
-	info.AddOption(ARG_FARM, "Farm template", "template")
+	info.AddOption(ARG_FARM, "Farm template name", "template")
 	info.AddOption(ARG_TOKEN, "DigitalOcean token", "token")
 	info.AddOption(ARG_KEY, "Path to private key", "key-file")
 	info.AddOption(ARG_REGION, "DigitalOcean region", "region")
 	info.AddOption(ARG_NODE_SIZE, "Droplet size on DigitalOcean", "size")
 	info.AddOption(ARG_USER, "Build node user name", "username")
 	info.AddOption(ARG_FORCE, "Force command execution")
-	info.AddOption(ARG_NO_VALIDATE, "Don't validate preferencies")
+	info.AddOption(ARG_NO_VALIDATE, "Don't validate preferences")
 	info.AddOption(ARG_NO_COLOR, "Disable colors in output")
 	info.AddOption(ARG_HELP, "Show this help message")
 	info.AddOption(ARG_VER, "Show version")
 
 	info.AddExample(CMD_CREATE+" --node-size 8gb --ttl 3h", "Create farm with redefined node size and TTL")
 	info.AddExample(CMD_CREATE+" --force", "Forced farm creation (without prompt)")
-	info.AddExample(CMD_DESTROY, "Destory all farm nodes")
+	info.AddExample(CMD_DESTROY, "Destroy all farm nodes")
 	info.AddExample(CMD_STATUS, "Show info about terrafarm")
 
 	info.Render()

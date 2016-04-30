@@ -20,7 +20,8 @@ import (
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
-type Prefs struct {
+// Preferences contains farm preferences
+type Preferences struct {
 	TTL      int64
 	Output   string
 	Token    string
@@ -34,9 +35,9 @@ type Prefs struct {
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
-// findAndReadPrefs read prefs from file and command-line arguments
-func findAndReadPrefs() *Prefs {
-	prefs := &Prefs{
+// findAndReadPreferences read preferences from file and command-line arguments
+func findAndReadPreferences() *Preferences {
+	prefs := &Preferences{
 		Password: crypto.GenPassword(18, crypto.STRENGTH_MEDIUM),
 	}
 
@@ -46,17 +47,17 @@ func findAndReadPrefs() *Prefs {
 	})
 
 	if prefsFile != "" {
-		applyPrefsFromFile(prefs, prefsFile)
+		applyPreferencesFromFile(prefs, prefsFile)
 	}
 
-	applyPrefsFromArgs(prefs)
-	validatePrefs(prefs)
+	applyPreferencesFromArgs(prefs)
+	validatePreferences(prefs)
 
 	return prefs
 }
 
-// applyPrefsFromFile read arguments from file and add it to prefs struct
-func applyPrefsFromFile(prefs *Prefs, file string) {
+// applyPreferencesFromFile read arguments from file and add it to preferences struct
+func applyPreferencesFromFile(prefs *Preferences, file string) {
 	data, err := ioutil.ReadFile(file)
 
 	if err != nil {
@@ -114,8 +115,8 @@ func applyPrefsFromFile(prefs *Prefs, file string) {
 	}
 }
 
-// applyPrefsFromArgs add values from command-line arguments to prefs struct
-func applyPrefsFromArgs(prefs *Prefs) {
+// applyPreferencesFromArgs add values from command-line arguments to preferences struct
+func applyPreferencesFromArgs(prefs *Preferences) {
 	if arg.Has(ARG_TTL) {
 		prefs.TTL = parseTTL(arg.GetS(ARG_TTL))
 
@@ -188,8 +189,8 @@ func parseTTL(ttl string) int64 {
 	return ttlVal * mult
 }
 
-// validatePrefs validate basic preferencies
-func validatePrefs(prefs *Prefs) {
+// validatePreferences validate basic preferences
+func validatePreferences(prefs *Preferences) {
 	hasErrors := false
 
 	if prefs.Token == "" {
