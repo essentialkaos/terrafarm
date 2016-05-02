@@ -16,7 +16,7 @@
 
 #### Usage demo
 
-[![asciicast](https://asciinema.org/a/44185.png)](https://asciinema.org/a/44185)
+[![asciicast](https://asciinema.org/a/44299.png)](https://asciinema.org/a/44299)
 
 #### Installation
 
