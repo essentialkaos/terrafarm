@@ -17,18 +17,10 @@ resource "digitalocean_droplet" "builder-x32" {
   provisioner "remote-exec" {
     inline = [
       "export PATH=$PATH:/usr/bin",
-      "echo 'Cleaning yum cache...'",
-      "yum -y -q clean expire-cache",
-      "echo 'Updating system packages...'",
-      "yum -y -q update",
       "echo 'Installing KAOS repository package...'",
       "yum -y -q install http://release.yum.kaos.io/i386/kaos-repo-6.8-1.el6.noarch.rpm",
       "echo 'Installing EPEL repository package...'",
       "yum -y -q install epel-repo",
-      "echo 'Installing Atrpms repository package...'",
-      "yum -y -q install atrpms-repo",
-      "echo 'Updating packages...'",
-      "yum -y -q update",
       "echo 'Installing RPMBuilder Node package...'",
       "yum -y -q install rpmbuilder-node",
       "echo 'Starting node configuration...'",

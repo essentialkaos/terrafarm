@@ -2,6 +2,22 @@
 
 `terrafarm` is utility for working with terraform based rpmbuilder farm on [DigitalOcean](https://www.digitalocean.com).
 
+* [Usage Demo](#usage-demo)
+* [Installation](#installation)
+* [Configuration](#configuration)
+  * [Preferences file](#preferences-file)
+  * [Environment variables](#environment-variables)
+  * [Command-line Arguments](#command-line-arguments)
+* [Debugging](#debugging)
+* [Usage](#usage)
+* [Build Status](#build-status)
+* [Contributing](#contributing)
+* [License](#license)
+
+#### Usage demo
+
+[![asciicast](https://asciinema.org/a/44299.png)](https://asciinema.org/a/44299)
+
 #### Installation
 
 To build the terrafarm from scratch, make sure you have a working Go 1.5+ workspace ([instructions](https://golang.org/doc/install)), then:
@@ -18,7 +34,17 @@ go get -u github.com/essentialkaos/terrafarm
 
 #### Configuration
 
-`terrafarm` use two ways for farm preconfiguration — preferences file and command-line arguments. Preferences file use next format:
+`terrafarm` have three ways for farm configuration — preferences file, environment variables and command-line arguments.
+
+You can use all three ways simultaneously, but in this case `terrafarm` uses different priority for each way:
+
+1. Preferences file (_lowest priority_)
+2. Environment variables
+3. Command-line arguments (_highest priority_)
+
+##### Preferences file
+
+Preferences file use next format:
 
 ```yaml
 prop-name: prop-value
@@ -38,15 +64,34 @@ ttl: 240
 
 Preferences file must be named as `.terrafarm` and placed in your `HOME` directory.
 
-Command-line arguments have higher priority and overwrite properties defined in preferences file.
+##### Environment variables
 
-If you want to use your own Terraform data without modifying original data, you can set path to Terraform data using `TERRADATA` environment variable.
+_Environment variables overwrite properties defined in preferences file._
+
+You can define or redefine properties using next variables:
+
+* `TERRAFARM_DATA` - Path to directory with your own Terraform data
+* `TERRAFARM_TTL` - Max farm TTL (Time To Live)
+* `TERRAFARM_OUTPUT` - Path to output file with access credentials
+* `TERRAFARM_TEMPLATE` - Farm template name
+* `TERRAFARM_TOKEN` - DigitalOcean token
+* `TERRAFARM_KEY` - Droplet size on DigitalOcean
+* `TERRAFARM_REGION` - DigitalOcean region
+* `TERRAFARM_NODE_SIZE` - Droplet size on DigitalOcean
+* `TERRAFARM_USER` - Build node user name
+* `TERRAFARM_PASSWORD` - Build node user password
 
 Example:
 
 ```bash
-TERRADATA=/home/user/my-own-terrafrom-data terrafarm create
+TERRAFARM_DATA=/home/user/my-own-terraform-data TERRAFARM_TTL=1h terrafarm create
 ```
+
+##### Command-line arguments
+
+_Command-line arguments overwrite properties defined in preferences file and environment variables._
+
+All supported command-line arguments with usage examples can be found in [usage](#usage) section.
 
 #### Debugging
 
@@ -65,22 +110,24 @@ Commands:
 
   create      Create and run farm droplets on DigitalOcean
   destroy     Destroy farm droplets on DigitalOcean
-  status      Show current Terrafarm preferencies and status
+  status      Show current Terrafarm preferences and status
 
 Options:
 
-  --ttl, -t ttl           Max farm TTL (Time To Live)
-  --output, -o file       Path to output file with access credentials
-  --token, -T token       DigitalOcean token
-  --key, -K key-file      Path to private key
-  --region, -R region     DigitalOcean region
-  --node-size, -N size    Droplet size on DigitalOcean
-  --user, -U username     Build node user name
-  --force, -f             Force command execution
-  --no-validate, -nv      Don't validate preferencies
-  --no-color, -nc         Disable colors in output
-  --help, -h              Show this help message
-  --version, -v           Show version
+  --ttl, -t ttl              Max farm TTL (Time To Live)
+  --output, -o file          Path to output file with access credentials
+  --template, -L name        Farm template name
+  --token, -T token          DigitalOcean token
+  --key, -K key-file         Path to private key
+  --region, -R region        DigitalOcean region
+  --node-size, -N size       Droplet size on DigitalOcean
+  --user, -U username        Build node user name
+  --password, -P password    Build node user password
+  --force, -f                Force command execution
+  --no-validate, -nv         Don't validate preferences
+  --no-color, -nc            Disable colors in output
+  --help, -h                 Show this help message
+  --version, -v              Show version
 
 Examples:
 
@@ -91,7 +138,7 @@ Examples:
   Forced farm creation (without prompt)
 
   terrafarm destroy
-  Destory all farm nodes
+  Destroy all farm nodes
 
   terrafarm status
   Show info about terrafarm

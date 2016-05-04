@@ -15,13 +15,13 @@ import (
 
 	"pkg.re/essentialkaos/ek.v1/arg"
 	"pkg.re/essentialkaos/ek.v1/crypto"
-	"pkg.re/essentialkaos/ek.v1/fmtc"
 	"pkg.re/essentialkaos/ek.v1/fsutil"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
-type Prefs struct {
+// Preferences contains farm preferences
+type Preferences struct {
 	TTL      int64
 	Output   string
 	Token    string
@@ -30,18 +30,20 @@ type Prefs struct {
 	NodeSize string
 	User     string
 	Password string
+	Template string
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
-// findAndReadPrefs read prefs from file and command-line arguments
-func findAndReadPrefs() *Prefs {
-	prefs := &Prefs{
-		Region:   "fra1",
-		NodeSize: "16gb",
+// findAndReadPreferences read preferences from file and command-line arguments
+func findAndReadPreferences() *Preferences {
+	prefs := &Preferences{
 		TTL:      240,
+		Region:   "ams3",
+		NodeSize: "16gb",
 		User:     "builder",
 		Password: crypto.GenPassword(18, crypto.STRENGTH_MEDIUM),
+		Template: "c6-multiarch",
 	}
 
 	prefsFile := fsutil.ProperPath("FRS", []string{
@@ -50,17 +52,18 @@ func findAndReadPrefs() *Prefs {
 	})
 
 	if prefsFile != "" {
-		applyPrefsFromFile(prefs, prefsFile)
+		applyPreferencesFromFile(prefs, prefsFile)
 	}
 
-	applyPrefsFromArgs(prefs)
-	validatePrefs(prefs)
+	applyPreferencesFromEnvironment(prefs)
+	applyPreferencesFromArgs(prefs)
+	validatePreferences(prefs)
 
 	return prefs
 }
 
-// applyPrefsFromFile read arguments from file and add it to prefs struct
-func applyPrefsFromFile(prefs *Prefs, file string) {
+// applyPreferencesFromFile read arguments from file and add it to preferences struct
+func applyPreferencesFromFile(prefs *Preferences, file string) {
 	data, err := ioutil.ReadFile(file)
 
 	if err != nil {
@@ -88,7 +91,7 @@ func applyPrefsFromFile(prefs *Prefs, file string) {
 			prefs.TTL = parseTTL(propVal)
 
 			if prefs.TTL == -1 {
-				fmtc.Printf("{r}Can't parse ttl property in %s file{!}\n", file)
+				printError("Can't parse ttl property in %s file", file)
 			}
 
 		case "output":
@@ -109,19 +112,22 @@ func applyPrefsFromFile(prefs *Prefs, file string) {
 		case "user":
 			prefs.User = propVal
 
+		case "template":
+			prefs.Template = propVal
+
 		default:
-			fmtc.Printf("{y}Unknown property %s in %s file{!}\n", propName, file)
+			printWarn("Unknown property %s in %s file", propName, file)
 		}
 	}
 }
 
-// applyPrefsFromArgs add values from command-line arguments to prefs struct
-func applyPrefsFromArgs(prefs *Prefs) {
+// applyPreferencesFromArgs add values from command-line arguments to preferences struct
+func applyPreferencesFromArgs(prefs *Preferences) {
 	if arg.Has(ARG_TTL) {
 		prefs.TTL = parseTTL(arg.GetS(ARG_TTL))
 
 		if prefs.TTL == -1 {
-			fmtc.Println("{r}Can't parse ttl property from command-line arguments{!}")
+			printError("Can't parse ttl property from command-line arguments")
 		}
 	}
 
@@ -151,6 +157,52 @@ func applyPrefsFromArgs(prefs *Prefs) {
 
 	if arg.Has(ARG_PASSWORD) {
 		prefs.Password = arg.GetS(ARG_PASSWORD)
+	}
+
+	if arg.Has(ARG_TEMPLATE) {
+		prefs.Template = arg.GetS(ARG_TEMPLATE)
+	}
+}
+
+func applyPreferencesFromEnvironment(prefs *Preferences) {
+	if envMap[EV_TTL] != "" {
+		prefs.TTL = parseTTL(envMap[EV_TTL])
+
+		if prefs.TTL == -1 {
+			printError("Can't parse ttl property from environment variables")
+		}
+	}
+
+	if envMap[EV_OUTPUT] != "" {
+		prefs.Output = envMap[EV_OUTPUT]
+	}
+
+	if envMap[EV_TOKEN] != "" {
+		prefs.Token = envMap[EV_TOKEN]
+	}
+
+	if envMap[EV_KEY] != "" {
+		prefs.Key = envMap[EV_KEY]
+	}
+
+	if envMap[EV_REGION] != "" {
+		prefs.Region = envMap[EV_REGION]
+	}
+
+	if envMap[EV_NODE_SIZE] != "" {
+		prefs.NodeSize = envMap[EV_NODE_SIZE]
+	}
+
+	if envMap[EV_USER] != "" {
+		prefs.User = envMap[EV_USER]
+	}
+
+	if envMap[EV_PASSWORD] != "" {
+		prefs.Password = envMap[EV_PASSWORD]
+	}
+
+	if envMap[EV_TEMPLATE] != "" {
+		prefs.Template = envMap[EV_TEMPLATE]
 	}
 }
 
@@ -185,60 +237,83 @@ func parseTTL(ttl string) int64 {
 	return ttlVal * mult
 }
 
-func validatePrefs(prefs *Prefs) {
+// validatePreferences validate basic preferences
+func validatePreferences(prefs *Preferences) {
 	hasErrors := false
 
 	if prefs.Token == "" {
-		fmtc.Println("{r}Property token must be set{!}")
+		printError("Property token must be set")
 		hasErrors = true
 	}
 
 	if prefs.Region == "" {
-		fmtc.Println("{r}Property region must be set{!}")
+		printError("Property region must be set")
 		hasErrors = true
 	}
 
 	if prefs.NodeSize == "" {
-		fmtc.Println("{r}Property node-size must be set{!}")
+		printError("Property node-size must be set")
 		hasErrors = true
 	}
 
 	if prefs.User == "" {
-		fmtc.Println("{r}Property user must be set{!}")
+		printError("Property user must be set")
 		hasErrors = true
 	}
 
 	if prefs.Key == "" {
-		fmtc.Println("{r}Property key must be set{!}")
+		printError("Property key must be set")
 		hasErrors = true
 	} else {
 		if !fsutil.IsExist(prefs.Key) {
-			fmtc.Printf("{r}Private key file %s does not exits{!}\n", prefs.Key)
+			printError("Private key file %s does not exits", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsReadable(prefs.Key) {
-			fmtc.Printf("{r}Private key file %s must be readable{!}\n", prefs.Key)
+			printError("Private key file %s must be readable", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsNonEmpty(prefs.Key) {
-			fmtc.Printf("{r}Private key file %s does not contain any data{!}\n", prefs.Key)
+			printError("Private key file %s does not contain any data", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsExist(prefs.Key + ".pub") {
-			fmtc.Printf("{r}Public key file %s.pub does not exits{!}\n", prefs.Key)
+			printError("Public key file %s.pub does not exits", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsReadable(prefs.Key + ".pub") {
-			fmtc.Printf("{r}Public key file %s.pub must be readable{!}\n", prefs.Key)
+			printError("Public key file %s.pub must be readable", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsNonEmpty(prefs.Key + ".pub") {
-			fmtc.Printf("{r}Public key file %s.pub does not contain any data{!}\n", prefs.Key)
+			printError("Public key file %s.pub does not contain any data", prefs.Key)
+			hasErrors = true
+		}
+	}
+
+	templateDir := getDataDir() + "/" + prefs.Template
+
+	if !fsutil.IsExist(templateDir) {
+		printError("Directory with farm data %s is not exist", templateDir)
+		hasErrors = true
+	} else {
+		if !fsutil.IsReadable(templateDir) {
+			printError("Directory with farm data %s is not readable", templateDir)
+			hasErrors = true
+		}
+
+		if fsutil.IsDir(templateDir) {
+			if fsutil.IsEmptyDir(templateDir) {
+				printError("Directory with farm data %s is empty", templateDir)
+				hasErrors = true
+			}
+		} else {
+			printError("Target %s is not a directory", templateDir)
 			hasErrors = true
 		}
 	}

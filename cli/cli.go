@@ -40,12 +40,14 @@ import (
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
+// App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.5.1"
+	VER  = "0.6.0"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
+// List of supported command-line arguments
 const (
 	ARG_TTL         = "t:ttl"
 	ARG_OUTPUT      = "o:output"
@@ -55,6 +57,7 @@ const (
 	ARG_NODE_SIZE   = "N:node-size"
 	ARG_USER        = "U:user"
 	ARG_PASSWORD    = "P:password"
+	ARG_TEMPLATE    = "L:template"
 	ARG_DEBUG       = "D:debug"
 	ARG_MONITOR     = "m:monitor"
 	ARG_FORCE       = "f:force"
@@ -64,6 +67,7 @@ const (
 	ARG_VER         = "v:version"
 )
 
+// List of supported commands
 const (
 	CMD_CREATE  = "create"
 	CMD_APPLY   = "apply"
@@ -76,7 +80,21 @@ const (
 	CMD_STATE   = "state"
 )
 
-// TERRAFORM_DATA_DIR is name of dir with terraform data
+// List of supported environment variables
+const (
+	EV_DATA      = "TERRAFARM_DATA"
+	EV_TTL       = "TERRAFARM_TTL"
+	EV_OUTPUT    = "TERRAFARM_OUTPUT"
+	EV_TEMPLATE  = "TERRAFARM_TEMPLATE"
+	EV_TOKEN     = "TERRAFARM_TOKEN"
+	EV_KEY       = "TERRAFARM_KEY"
+	EV_REGION    = "TERRAFARM_REGION"
+	EV_NODE_SIZE = "TERRAFARM_NODE_SIZE"
+	EV_USER      = "TERRAFARM_USER"
+	EV_PASSWORD  = "TERRAFARM_PASSWORD"
+)
+
+// TERRAFORM_DATA_DIR is name of directory with terraform data
 const TERRAFORM_DATA_DIR = "terradata"
 
 // TERRAFORM_STATE_FILE is name terraform state file name
@@ -94,12 +112,12 @@ const FARM_STATE_FILE = ".farm-state"
 // MONITOR_LOG_FILE is name of monitor log file
 const MONITOR_LOG_FILE = "monitor.log"
 
-// DATA_ENV_VAR is name of environment variable with path to data directory
-const DATA_ENV_VAR = "TERRADATA"
+// SEPARATOR is separator used for log output
+const SEPARATOR = "----------------------------------------------------------------------------------------"
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
-// MonitorState cotains monitor specific info
+// MonitorState contains monitor specific info
 type MonitorState struct {
 	Pid          int   `json:"pid"`
 	DestroyAfter int64 `json:"destroy_after"`
@@ -107,8 +125,8 @@ type MonitorState struct {
 
 // FarmState contains farm specific info
 type FarmState struct {
-	Prefs       *Prefs `json:"prefs"`
-	Fingerprint string `json:"fingerprint"`
+	Preferences *Preferences `json:"preferences"`
+	Fingerprint string       `json:"fingerprint"`
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -122,6 +140,7 @@ var argMap = arg.Map{
 	ARG_REGION:      &arg.V{},
 	ARG_NODE_SIZE:   &arg.V{},
 	ARG_USER:        &arg.V{},
+	ARG_TEMPLATE:    &arg.V{},
 	ARG_DEBUG:       &arg.V{Type: arg.BOOL},
 	ARG_MONITOR:     &arg.V{Type: arg.INT},
 	ARG_FORCE:       &arg.V{Type: arg.BOOL},
@@ -153,7 +172,7 @@ func Init() {
 		fmtc.NewLine()
 
 		for _, err := range errs {
-			fmtc.Printf("{r}%v{!}\n", err)
+			printError(err.Error())
 		}
 
 		os.Exit(1)
@@ -192,32 +211,32 @@ func Init() {
 // checkEnv check system environment
 func checkEnv() {
 	if envMap["GOPATH"] == "" {
-		fmtc.Println("{r}GOPATH must be set to valid path{!}")
+		printError("GOPATH must be set to valid path")
 		os.Exit(1)
 	}
 
 	srcDir := getSrcDir()
 
 	if !fsutil.CheckPerms("DRW", srcDir) {
-		fmtc.Printf("{r}Source directory %s is not accessible{!}\n", srcDir)
+		printError("Source directory %s is not accessible", srcDir)
 		os.Exit(1)
 	}
 
 	dataDir := getDataDir()
 
 	if !fsutil.CheckPerms("DRW", dataDir) {
-		fmtc.Printf("{r}Data directory %s is not accessible{!}\n", dataDir)
+		printError("Data directory %s is not accessible", dataDir)
 		os.Exit(1)
 	}
 }
 
-// checkDeps check required dependecies
+// checkDeps check required dependencies
 func checkDeps() {
 	hasErrors := false
 
 	for _, dep := range depList {
 		if env.Which(dep) == "" {
-			fmtc.Printf("{r}Can't find %s. Please install it first.{!}\n", dep)
+			printError("Can't find %s. Please install it first.", dep)
 			hasErrors = true
 		}
 	}
@@ -246,12 +265,14 @@ func startMonitor() {
 	}
 
 	log.Set(getMonitorLogFilePath(), 0644)
+	log.Aux(SEPARATOR)
 	log.Aux("Terrafarm %s monitor started", VER)
 	log.Info("Farm will be destroyed after %s", timeutil.Format(destroyAfter, "%Y/%m/%d %H:%M:%S"))
 
 	for {
 		if !isTerrafarmActive() {
 			log.Info("Farm destroyed manually")
+			os.Remove(stateFile)
 			os.Exit(0)
 		}
 
@@ -263,14 +284,14 @@ func startMonitor() {
 
 		log.Info("Starting farm destroying...")
 
-		prefs := findAndReadPrefs()
-		vars, err := prefsToArgs(prefs)
+		prefs := findAndReadPreferences()
+		vars, err := prefsToArgs(prefs, "-no-color", "-force")
 
 		if err != nil {
 			continue
 		}
 
-		vars = append(vars, "-force")
+		fsutil.Push(path.Join(getDataDir(), prefs.Template))
 
 		err = execTerraform(true, "destroy", vars)
 
@@ -278,6 +299,10 @@ func startMonitor() {
 			log.Error("Can't destroy farm - terrafarm return error: %v", err)
 			continue
 		}
+
+		fsutil.Pop()
+
+		os.Remove(getFarmStateFilePath())
 
 		break
 	}
@@ -289,7 +314,7 @@ func startMonitor() {
 
 // processCommand execute some command
 func processCommand(cmd string) {
-	prefs := findAndReadPrefs()
+	prefs := findAndReadPreferences()
 
 	scm := getSpellcheckModel()
 	cmd = scm.Correct(cmd)
@@ -308,16 +333,16 @@ func processCommand(cmd string) {
 }
 
 // createCommand is create command handler
-func createCommand(prefs *Prefs) {
+func createCommand(prefs *Preferences) {
 	if isTerrafarmActive() {
-		fmtc.Println("{y}Terrafarm already works{!}")
+		printWarn("Terrafarm already works")
 		os.Exit(1)
 	}
 
 	statusCommand(prefs)
 
 	if !arg.GetB(ARG_FORCE) {
-		if !terminal.ReadAnswer("Create farm with this preferencies? (y/N)", "n") {
+		if !terminal.ReadAnswer("Create farm with this preferences? (y/N)", "n") {
 			fmtc.NewLine()
 			return
 		}
@@ -328,7 +353,7 @@ func createCommand(prefs *Prefs) {
 	vars, err := prefsToArgs(prefs)
 
 	if err != nil {
-		fmtc.Printf("{r}Can't parse prefs: %v{!}\n", err)
+		printError("Can't parse preferences: %v", err)
 		os.Exit(1)
 	}
 
@@ -338,12 +363,16 @@ func createCommand(prefs *Prefs) {
 		fmtc.Printf("{s}EXEC → terraform apply %s{!}\n\n", strings.Join(vars, " "))
 	}
 
+	fsutil.Push(path.Join(getDataDir(), prefs.Template))
+
 	err = execTerraform(false, "apply", vars)
 
 	if err != nil {
 		fmtc.Printf("{r}Error while executing terraform: %v\n{!}", err)
 		os.Exit(1)
 	}
+
+	fsutil.Pop()
 
 	fmtutil.Separator(false)
 
@@ -371,7 +400,7 @@ func createCommand(prefs *Prefs) {
 			os.Exit(1)
 		}
 
-		fmtc.Println("{g}Monitoring process succefully started!{!}")
+		fmtc.Println("{g}Monitoring process successfully started!{!}")
 
 		fmtutil.Separator(false)
 	}
@@ -380,7 +409,7 @@ func createCommand(prefs *Prefs) {
 }
 
 // statusCommand is status command handler
-func statusCommand(prefs *Prefs) {
+func statusCommand(prefs *Preferences) {
 	var (
 		tokenValid       bool
 		fingerprintValid bool
@@ -396,7 +425,7 @@ func statusCommand(prefs *Prefs) {
 
 		if err == nil {
 			disableValidate = true
-			prefs = farmState.Prefs
+			prefs = farmState.Preferences
 			fingerprint = farmState.Fingerprint
 		}
 	}
@@ -410,6 +439,7 @@ func statusCommand(prefs *Prefs) {
 
 	fmtutil.Separator(false, "TERRAFARM")
 
+	fmtc.Printf("  {*}%-16s{!} %s\n", "Template:", prefs.Template)
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
 
 	printValidationMarker(tokenValid, disableValidate)
@@ -477,7 +507,7 @@ func statusCommand(prefs *Prefs) {
 }
 
 // destroyCommand is destroy command handler
-func destroyCommand(prefs *Prefs) {
+func destroyCommand(prefs *Preferences) {
 	if !isTerrafarmActive() {
 		fmtc.Println("{y}Terrafarm does not works, nothing to destroy{!}")
 		os.Exit(1)
@@ -493,20 +523,20 @@ func destroyCommand(prefs *Prefs) {
 
 	fmtutil.Separator(false)
 
-	vars, err := prefsToArgs(prefs)
+	vars, err := prefsToArgs(prefs, "-force")
 
 	if err != nil {
-		fmtc.Printf("{r}Can't parse prefs: %v{!}\n", err)
+		printError("Can't parse prefs: %v", err)
 		os.Exit(1)
 	}
 
 	addSignalInterception()
 
-	vars = append(vars, "-force")
-
 	if arg.GetB(ARG_DEBUG) {
 		fmtc.Printf("{s}EXEC → terraform destroy %s{!}\n\n", strings.Join(vars, " "))
 	}
+
+	fsutil.Push(path.Join(getDataDir(), prefs.Template))
 
 	err = execTerraform(false, "destroy", vars)
 
@@ -515,21 +545,23 @@ func destroyCommand(prefs *Prefs) {
 		os.Exit(1)
 	}
 
+	fsutil.Pop()
+
 	fmtutil.Separator(false)
 
 	os.Remove(getFarmStateFilePath())
 }
 
 // saveFarmState collect and save farm state into file
-func saveState(prefs *Prefs) {
+func saveState(prefs *Preferences) {
 	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
 
 	farmState := &FarmState{
-		Prefs:       prefs,
+		Preferences: prefs,
 		Fingerprint: fingerprint,
 	}
 
-	farmState.Prefs.Token = getCryptedToken(prefs.Token)
+	farmState.Preferences.Token = getCryptedToken(prefs.Token)
 
 	err := saveFarmState(getFarmStateFilePath(), farmState)
 
@@ -590,8 +622,8 @@ func getCryptedToken(token string) string {
 	return token[:8] + "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" + token[56:]
 }
 
-// prefsToArgs return prefs as command line arguments for terraform
-func prefsToArgs(prefs *Prefs) ([]string, error) {
+// prefsToArgs return preferences as command line arguments for terraform
+func prefsToArgs(prefs *Preferences, args ...string) ([]string, error) {
 	auth, err := getPasswordHash(prefs.Password)
 
 	if err != nil {
@@ -621,13 +653,17 @@ func prefsToArgs(prefs *Prefs) ([]string, error) {
 		vars = append(vars, fmtc.Sprintf("-var node_size=%s", prefs.NodeSize))
 	}
 
+	vars = append(vars, fmtc.Sprintf("-state=%s", getTerraformStateFilePath()))
+
+	if len(args) != 0 {
+		vars = append(vars, args...)
+	}
+
 	return vars, nil
 }
 
 // exec execute command
 func execTerraform(logOutput bool, command string, args []string) error {
-	fsutil.Push(getDataDir())
-
 	cmd := exec.Command("terraform", command)
 
 	if len(args) != 0 {
@@ -663,8 +699,6 @@ func execTerraform(logOutput bool, command string, args []string) error {
 	if err != nil {
 		return fmtc.Errorf("Can't process terraform output: %v", err)
 	}
-
-	fsutil.Pop()
 
 	return nil
 }
@@ -733,8 +767,8 @@ func isMonitorActive() bool {
 
 // getDataDir return path to directory with terraform data
 func getDataDir() string {
-	if envMap[DATA_ENV_VAR] != "" {
-		return envMap[DATA_ENV_VAR]
+	if envMap[EV_DATA] != "" {
+		return envMap[EV_DATA]
 	}
 
 	return path.Join(getSrcDir(), TERRAFORM_DATA_DIR)
@@ -757,7 +791,7 @@ func getFarmStateFilePath() string {
 
 // getMonitorLogFilePath return path to monitor log file
 func getMonitorLogFilePath() string {
-	return path.Join(getSrcDir(), MONITOR_LOG_FILE)
+	return path.Join(getDataDir(), MONITOR_LOG_FILE)
 }
 
 // getMonitorStateFilePath return path to monitor state file
@@ -811,7 +845,7 @@ func runMonitor(ttl int64) error {
 }
 
 // exportNodeList exports info about nodes for usage in rpmbuilder
-func exportNodeList(prefs *Prefs) error {
+func exportNodeList(prefs *Preferences) error {
 	if fsutil.IsExist(prefs.Output) {
 		if fsutil.IsDir(prefs.Output) {
 			return fmtc.Errorf("Output path must be path to file")
@@ -869,7 +903,7 @@ func exportNodeList(prefs *Prefs) error {
 
 // signalInterceptor is TERM and INT signal handler
 func signalInterceptor() {
-	fmtc.Println("\n{y}You can't cancel command execution in this time{!}")
+	printWarn("\nYou can't cancel command execution in this time")
 }
 
 // getSpellcheckModel return spellcheck model for correcting
@@ -882,6 +916,16 @@ func getSpellcheckModel() *spellcheck.Model {
 	})
 }
 
+// printError prints error message to console
+func printError(f string, a ...interface{}) {
+	fmtc.Printf("{r}"+f+"{!}\n", a...)
+}
+
+// printError prints warning message to console
+func printWarn(f string, a ...interface{}) {
+	fmtc.Printf("{y}"+f+"{!}\n", a...)
+}
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 // showUsage show help content
@@ -890,24 +934,26 @@ func showUsage() {
 
 	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean")
 	info.AddCommand(CMD_DESTROY, "Destroy farm droplets on DigitalOcean")
-	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferencies and status")
+	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferences and status")
 
 	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "ttl")
 	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
+	info.AddOption(ARG_TEMPLATE, "Farm template name", "name")
 	info.AddOption(ARG_TOKEN, "DigitalOcean token", "token")
 	info.AddOption(ARG_KEY, "Path to private key", "key-file")
 	info.AddOption(ARG_REGION, "DigitalOcean region", "region")
 	info.AddOption(ARG_NODE_SIZE, "Droplet size on DigitalOcean", "size")
 	info.AddOption(ARG_USER, "Build node user name", "username")
+	info.AddOption(ARG_PASSWORD, "Build node user password", "password")
 	info.AddOption(ARG_FORCE, "Force command execution")
-	info.AddOption(ARG_NO_VALIDATE, "Don't validate preferencies")
+	info.AddOption(ARG_NO_VALIDATE, "Don't validate preferences")
 	info.AddOption(ARG_NO_COLOR, "Disable colors in output")
 	info.AddOption(ARG_HELP, "Show this help message")
 	info.AddOption(ARG_VER, "Show version")
 
 	info.AddExample(CMD_CREATE+" --node-size 8gb --ttl 3h", "Create farm with redefined node size and TTL")
 	info.AddExample(CMD_CREATE+" --force", "Forced farm creation (without prompt)")
-	info.AddExample(CMD_DESTROY, "Destory all farm nodes")
+	info.AddExample(CMD_DESTROY, "Destroy all farm nodes")
 	info.AddExample(CMD_STATUS, "Show info about terrafarm")
 
 	info.Render()
