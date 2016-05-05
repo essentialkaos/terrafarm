@@ -43,7 +43,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.6.0"
+	VER  = "0.6.1"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -161,6 +161,9 @@ var depList = []string{
 // envMap is map with environment variables
 var envMap = env.Get()
 
+// startTime is time when app is started
+var startTime = time.Now().Unix()
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 func Init() {
@@ -175,7 +178,7 @@ func Init() {
 			printError(err.Error())
 		}
 
-		os.Exit(1)
+		exit(1)
 	}
 
 	if arg.GetB(ARG_NO_COLOR) {
@@ -212,21 +215,21 @@ func Init() {
 func checkEnv() {
 	if envMap["GOPATH"] == "" {
 		printError("GOPATH must be set to valid path")
-		os.Exit(1)
+		exit(1)
 	}
 
 	srcDir := getSrcDir()
 
 	if !fsutil.CheckPerms("DRW", srcDir) {
 		printError("Source directory %s is not accessible", srcDir)
-		os.Exit(1)
+		exit(1)
 	}
 
 	dataDir := getDataDir()
 
 	if !fsutil.CheckPerms("DRW", dataDir) {
 		printError("Data directory %s is not accessible", dataDir)
-		os.Exit(1)
+		exit(1)
 	}
 }
 
@@ -242,7 +245,7 @@ func checkDeps() {
 	}
 
 	if hasErrors {
-		os.Exit(1)
+		exit(1)
 	}
 }
 
@@ -261,7 +264,7 @@ func startMonitor() {
 	err := saveMonitorState(stateFile, state)
 
 	if err != nil {
-		os.Exit(1)
+		exit(1)
 	}
 
 	log.Set(getMonitorLogFilePath(), 0644)
@@ -273,7 +276,7 @@ func startMonitor() {
 		if !isTerrafarmActive() {
 			log.Info("Farm destroyed manually")
 			os.Remove(stateFile)
-			os.Exit(0)
+			exit(0)
 		}
 
 		time.Sleep(time.Minute)
@@ -310,6 +313,8 @@ func startMonitor() {
 	log.Info("Farm successfully destroyed!")
 
 	os.Remove(stateFile)
+
+	exit(0)
 }
 
 // processCommand execute some command
@@ -328,15 +333,17 @@ func processCommand(cmd string) {
 		statusCommand(prefs)
 	default:
 		fmtc.Printf("{r}Unknown command %s\n", cmd)
-		os.Exit(1)
+		exit(1)
 	}
+
+	exit(0)
 }
 
 // createCommand is create command handler
 func createCommand(prefs *Preferences) {
 	if isTerrafarmActive() {
 		printWarn("Terrafarm already works")
-		os.Exit(1)
+		exit(1)
 	}
 
 	statusCommand(prefs)
@@ -354,7 +361,7 @@ func createCommand(prefs *Preferences) {
 
 	if err != nil {
 		printError("Can't parse preferences: %v", err)
-		os.Exit(1)
+		exit(1)
 	}
 
 	addSignalInterception()
@@ -369,7 +376,7 @@ func createCommand(prefs *Preferences) {
 
 	if err != nil {
 		fmtc.Printf("{r}Error while executing terraform: %v\n{!}", err)
-		os.Exit(1)
+		exit(1)
 	}
 
 	fsutil.Pop()
@@ -397,7 +404,7 @@ func createCommand(prefs *Preferences) {
 
 		if err != nil {
 			fmtc.Printf("{r}Error while starting monitoring process: %v\n", err)
-			os.Exit(1)
+			exit(1)
 		}
 
 		fmtc.Println("{g}Monitoring process successfully started!{!}")
@@ -510,7 +517,7 @@ func statusCommand(prefs *Preferences) {
 func destroyCommand(prefs *Preferences) {
 	if !isTerrafarmActive() {
 		fmtc.Println("{y}Terrafarm does not works, nothing to destroy{!}")
-		os.Exit(1)
+		exit(1)
 	}
 
 	if !arg.GetB(ARG_FORCE) {
@@ -527,7 +534,7 @@ func destroyCommand(prefs *Preferences) {
 
 	if err != nil {
 		printError("Can't parse prefs: %v", err)
-		os.Exit(1)
+		exit(1)
 	}
 
 	addSignalInterception()
@@ -542,7 +549,7 @@ func destroyCommand(prefs *Preferences) {
 
 	if err != nil {
 		fmtc.Printf("{r}Error while executing terraform: %v\n{!}", err)
-		os.Exit(1)
+		exit(1)
 	}
 
 	fsutil.Pop()
@@ -924,6 +931,34 @@ func printError(f string, a ...interface{}) {
 // printError prints warning message to console
 func printWarn(f string, a ...interface{}) {
 	fmtc.Printf("{y}"+f+"{!}\n", a...)
+}
+
+// cleanTerraformGarbage remove tf-plugin* files from
+// temporary directory
+func cleanTerraformGarbage() {
+	garbage := fsutil.List(
+		"/tmp", false,
+		&fsutil.ListingFilter{
+			MatchPatterns: []string{"tf-plugin*"},
+			CTimeYounger:  startTime,
+		},
+	)
+
+	if len(garbage) == 0 {
+		return
+	}
+
+	fsutil.ListToAbsolute("/tmp", garbage)
+
+	for _, file := range garbage {
+		os.Remove(file)
+	}
+}
+
+// exit exit from app with given code
+func exit(code int) {
+	cleanTerraformGarbage()
+	os.Exit(code)
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
