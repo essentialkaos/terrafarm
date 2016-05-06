@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -43,7 +44,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.6.1"
+	VER  = "0.6.2"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -69,15 +70,16 @@ const (
 
 // List of supported commands
 const (
-	CMD_CREATE  = "create"
-	CMD_APPLY   = "apply"
-	CMD_START   = "start"
-	CMD_DESTROY = "destroy"
-	CMD_DELETE  = "delete"
-	CMD_STOP    = "stop"
-	CMD_STATUS  = "status"
-	CMD_INFO    = "info"
-	CMD_STATE   = "state"
+	CMD_CREATE    = "create"
+	CMD_APPLY     = "apply"
+	CMD_START     = "start"
+	CMD_DESTROY   = "destroy"
+	CMD_DELETE    = "delete"
+	CMD_STOP      = "stop"
+	CMD_STATUS    = "status"
+	CMD_INFO      = "info"
+	CMD_STATE     = "state"
+	CMD_TEMPLATES = "templates"
 )
 
 // List of supported environment variables
@@ -331,6 +333,8 @@ func processCommand(cmd string) {
 		destroyCommand(prefs)
 	case CMD_STATUS, CMD_INFO, CMD_STATE:
 		statusCommand(prefs)
+	case CMD_TEMPLATES:
+		templatesCommand()
 	default:
 		fmtc.Printf("{r}Unknown command %s\n", cmd)
 		exit(1)
@@ -557,6 +561,41 @@ func destroyCommand(prefs *Preferences) {
 	fmtutil.Separator(false)
 
 	os.Remove(getFarmStateFilePath())
+}
+
+// templatesCommand is templates command handler
+func templatesCommand() {
+	dataDir := getDataDir()
+	templates := fsutil.List(
+		dataDir, true,
+		&fsutil.ListingFilter{Perms: "DRX"},
+	)
+
+	if len(templates) == 0 {
+		printWarn("No templates found")
+		return
+	}
+
+	sort.Strings(templates)
+
+	fmtutil.Separator(false, "TEMPLATES")
+
+	for _, template := range templates {
+		templateDir := path.Join(dataDir, template)
+		builders := len(fsutil.List(
+			templateDir, true,
+			&fsutil.ListingFilter{
+				MatchPatterns: []string{"builder*.tf"},
+			},
+		))
+
+		fmtc.Printf(
+			"  %s {s}(%s){!}\n", template,
+			fmtutil.Pluralize(builders, "build node", "build nodes"),
+		)
+	}
+
+	fmtutil.Separator(false)
 }
 
 // saveFarmState collect and save farm state into file
@@ -970,6 +1009,7 @@ func showUsage() {
 	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean")
 	info.AddCommand(CMD_DESTROY, "Destroy farm droplets on DigitalOcean")
 	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferences and status")
+	info.AddCommand(CMD_TEMPLATES, "List all available farm templates")
 
 	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "ttl")
 	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
