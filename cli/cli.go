@@ -957,7 +957,9 @@ func exportNodeList(prefs *Preferences) error {
 	var result []string
 
 	for _, node := range nodes {
-		result = append(result, node)
+		if node != "" {
+			result = append(result, node)
+		}
 	}
 
 	fmtc.Fprintln(fd, strings.Join(result, "\n"))
