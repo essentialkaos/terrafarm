@@ -439,20 +439,38 @@ func statusCommand(prefs *Preferences) {
 		fingerprintValid bool
 		regionValid      bool
 		sizeValid        bool
+
+		ttlRemain         int64
+		currentUsagePrice float64
 	)
+
+	terrafarmActive := isTerrafarmActive()
+	monitorActive := isMonitorActive()
 
 	disableValidate := arg.GetB(ARG_NO_VALIDATE)
 	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
-	buildersCount := getBuildNodesCount(prefs.Template)
-	usagePrice := ((float64(prefs.TTL) / 60.0) * dropletPrices[prefs.NodeSize]) * float64(buildersCount)
 
-	if isTerrafarmActive() {
+	if terrafarmActive {
 		farmState, err := readFarmState(getFarmStateFilePath())
 
 		if err == nil {
 			disableValidate = true
 			prefs = farmState.Preferences
 			fingerprint = farmState.Fingerprint
+		}
+	}
+
+	buildersCount := getBuildNodesCount(prefs.Template)
+	ttlHours := float64(prefs.TTL) / 60.0
+	totalUsagePrice := (ttlHours * dropletPrices[prefs.NodeSize]) * float64(buildersCount)
+
+	if monitorActive {
+		state, err := readMonitorState(getMonitorStateFilePath())
+
+		if err == nil {
+			ttlRemain = state.DestroyAfter - time.Now().Unix()
+			usageHours := ttlHours - (float64(ttlRemain) / 3600.0)
+			currentUsagePrice = (usageHours * dropletPrices[prefs.NodeSize]) * float64(buildersCount)
 		}
 	}
 
@@ -492,10 +510,10 @@ func statusCommand(prefs *Preferences) {
 		fmtc.Printf("  {*}%-16s{!} {g}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
 	}
 
-	if prefs.TTL <= 0 || usagePrice <= 0 {
+	if prefs.TTL <= 0 || totalUsagePrice <= 0 {
 		fmtc.NewLine()
 	} else {
-		fmtc.Printf(" {s}(~ $%.2f){!}\n", usagePrice)
+		fmtc.Printf(" {s}(~ $%.2f){!}\n", totalUsagePrice)
 	}
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Region:", prefs.Region)
@@ -515,22 +533,24 @@ func statusCommand(prefs *Preferences) {
 	if !isTerrafarmActive() {
 		fmtc.Printf("  {*}%-16s{!} {s}stopped{!}\n", "State:")
 	} else {
-		fmtc.Printf("  {*}%-16s{!} {g}works{!}\n", "State:")
+		fmtc.Printf("  {*}%-16s{!} {g}works{!}", "State:")
 
-		if isMonitorActive() {
-			state, err := readMonitorState(getMonitorStateFilePath())
+		if currentUsagePrice == 0 {
+			fmtc.NewLine()
+		} else {
+			fmtc.Printf(" {s}($%.2f){!}\n", currentUsagePrice)
+		}
 
-			if err != nil {
+		if monitorActive {
+			if ttlRemain == 0 {
 				fmtc.Printf("  {*}%-16s{!} {r}unknown{!}\n", "Monitor:")
 			} else {
-				ttlEst := state.DestroyAfter - time.Now().Unix()
-
-				if ttlEst < 0 {
+				if ttlRemain < 0 {
 					fmtc.Printf("  {*}%-16s{!} {g}works{!} {y}(destroying){!}\n", "Monitor:")
 				} else {
 					fmtc.Printf(
 						"  {*}%-16s{!} {g}works{!} {s}(%s to destroy){!}\n",
-						"Monitor:", timeutil.PrettyDuration(ttlEst),
+						"Monitor:", timeutil.PrettyDuration(ttlRemain),
 					)
 				}
 			}
