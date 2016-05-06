@@ -430,6 +430,7 @@ func statusCommand(prefs *Preferences) {
 
 	disableValidate := arg.GetB(ARG_NO_VALIDATE)
 	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
+	buildersCount := getBuildNodesCount(prefs.Template)
 
 	if isTerrafarmActive() {
 		farmState, err := readFarmState(getFarmStateFilePath())
@@ -450,7 +451,11 @@ func statusCommand(prefs *Preferences) {
 
 	fmtutil.Separator(false, "TERRAFARM")
 
-	fmtc.Printf("  {*}%-16s{!} %s\n", "Template:", prefs.Template)
+	fmtc.Printf(
+		"  {*}%-16s{!} %s {s}(%s){!}\n", "Template:", prefs.Template,
+		fmtutil.Pluralize(buildersCount, "build node", "build nodes"),
+	)
+
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
 
 	printValidationMarker(tokenValid, disableValidate)
@@ -565,9 +570,8 @@ func destroyCommand(prefs *Preferences) {
 
 // templatesCommand is templates command handler
 func templatesCommand() {
-	dataDir := getDataDir()
 	templates := fsutil.List(
-		dataDir, true,
+		getDataDir(), true,
 		&fsutil.ListingFilter{Perms: "DRX"},
 	)
 
@@ -581,17 +585,11 @@ func templatesCommand() {
 	fmtutil.Separator(false, "TEMPLATES")
 
 	for _, template := range templates {
-		templateDir := path.Join(dataDir, template)
-		builders := len(fsutil.List(
-			templateDir, true,
-			&fsutil.ListingFilter{
-				MatchPatterns: []string{"builder*.tf"},
-			},
-		))
+		buildersCount := getBuildNodesCount(template)
 
 		fmtc.Printf(
 			"  %s {s}(%s){!}\n", template,
-			fmtutil.Pluralize(builders, "build node", "build nodes"),
+			fmtutil.Pluralize(buildersCount, "build node", "build nodes"),
 		)
 	}
 
@@ -809,6 +807,20 @@ func isMonitorActive() bool {
 	}
 
 	return fsutil.IsExist(path.Join("/proc", fmtc.Sprintf("%d", state.Pid)))
+}
+
+// getBuildNodesCount return number of nodes in given farm template
+func getBuildNodesCount(template string) int {
+	templateDir := path.Join(getDataDir(), template)
+
+	builders := fsutil.List(
+		templateDir, true,
+		&fsutil.ListingFilter{
+			MatchPatterns: []string{"builder*.tf"},
+		},
+	)
+
+	return len(builders)
 }
 
 // getDataDir return path to directory with terraform data
