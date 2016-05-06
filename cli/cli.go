@@ -166,6 +166,19 @@ var envMap = env.Get()
 // startTime is time when app is started
 var startTime = time.Now().Unix()
 
+// dropletPrices contains per-hour droplet prices
+var dropletPrices = map[string]float64{
+	"512mb": 0.007,
+	"1gb":   0.015,
+	"2gb":   0.030,
+	"4gb":   0.060,
+	"8gb":   0.119,
+	"16gb":  0.238,
+	"32gb":  0.426,
+	"48gb":  0.714,
+	"64gb":  0.952,
+}
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 func Init() {
@@ -431,6 +444,7 @@ func statusCommand(prefs *Preferences) {
 	disableValidate := arg.GetB(ARG_NO_VALIDATE)
 	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
 	buildersCount := getBuildNodesCount(prefs.Template)
+	usagePrice := ((float64(prefs.TTL) / 60.0) * dropletPrices[prefs.NodeSize]) * float64(buildersCount)
 
 	if isTerrafarmActive() {
 		farmState, err := readFarmState(getFarmStateFilePath())
@@ -469,13 +483,19 @@ func statusCommand(prefs *Preferences) {
 
 	switch {
 	case prefs.TTL <= 0:
-		fmtc.Printf("  {*}%-16s{!} {r}disabled{!}\n", "TTL:")
+		fmtc.Printf("  {*}%-16s{!} {r}disabled{!}", "TTL:")
 	case prefs.TTL > 360:
-		fmtc.Printf("  {*}%-16s{!} {r}%s{!}\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+		fmtc.Printf("  {*}%-16s{!} {r}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
 	case prefs.TTL > 120:
-		fmtc.Printf("  {*}%-16s{!} {y}%s{!}\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+		fmtc.Printf("  {*}%-16s{!} {y}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
 	default:
-		fmtc.Printf("  {*}%-16s{!} {g}%s{!}\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+		fmtc.Printf("  {*}%-16s{!} {g}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+	}
+
+	if prefs.TTL <= 0 || usagePrice <= 0 {
+		fmtc.NewLine()
+	} else {
+		fmtc.Printf(" {s}(~ $%.2f){!}\n", usagePrice)
 	}
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Region:", prefs.Region)
