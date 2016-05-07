@@ -16,7 +16,7 @@
 
 #### Usage demo
 
-[![asciicast](https://asciinema.org/a/44299.png)](https://asciinema.org/a/44299)
+[![asciicast](https://asciinema.org/a/44873.png)](https://asciinema.org/a/44873)
 
 #### Installation
 
@@ -108,9 +108,10 @@ Usage: terrafarm <command> <options>
 
 Commands:
 
-  create      Create and run farm droplets on DigitalOcean
-  destroy     Destroy farm droplets on DigitalOcean
-  status      Show current Terrafarm preferences and status
+  create        Create and run farm droplets on DigitalOcean
+  destroy       Destroy farm droplets on DigitalOcean
+  status        Show current Terrafarm preferences and status
+  templates     List all available farm templates
 
 Options:
 

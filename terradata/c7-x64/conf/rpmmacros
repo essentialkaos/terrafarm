@@ -1,0 +1,8 @@
+%_topdir             %(echo $HOME)/rpmbuild
+%_smp_mflags         -j8
+%debug_package       %{nil}
+%__arch_install_post /usr/lib/rpm/check-rpaths  /usr/lib/rpm/check-buildroot
+
+%dist            .el7
+%_source_payload w7.xzdio
+%_binary_payload w7.xzdio

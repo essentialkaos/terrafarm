@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -43,7 +44,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.6.1"
+	VER  = "0.7.0"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -69,15 +70,16 @@ const (
 
 // List of supported commands
 const (
-	CMD_CREATE  = "create"
-	CMD_APPLY   = "apply"
-	CMD_START   = "start"
-	CMD_DESTROY = "destroy"
-	CMD_DELETE  = "delete"
-	CMD_STOP    = "stop"
-	CMD_STATUS  = "status"
-	CMD_INFO    = "info"
-	CMD_STATE   = "state"
+	CMD_CREATE    = "create"
+	CMD_APPLY     = "apply"
+	CMD_START     = "start"
+	CMD_DESTROY   = "destroy"
+	CMD_DELETE    = "delete"
+	CMD_STOP      = "stop"
+	CMD_STATUS    = "status"
+	CMD_INFO      = "info"
+	CMD_STATE     = "state"
+	CMD_TEMPLATES = "templates"
 )
 
 // List of supported environment variables
@@ -163,6 +165,19 @@ var envMap = env.Get()
 
 // startTime is time when app is started
 var startTime = time.Now().Unix()
+
+// dropletPrices contains per-hour droplet prices
+var dropletPrices = map[string]float64{
+	"512mb": 0.007,
+	"1gb":   0.015,
+	"2gb":   0.030,
+	"4gb":   0.060,
+	"8gb":   0.119,
+	"16gb":  0.238,
+	"32gb":  0.426,
+	"48gb":  0.714,
+	"64gb":  0.952,
+}
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
@@ -331,6 +346,8 @@ func processCommand(cmd string) {
 		destroyCommand(prefs)
 	case CMD_STATUS, CMD_INFO, CMD_STATE:
 		statusCommand(prefs)
+	case CMD_TEMPLATES:
+		templatesCommand()
 	default:
 		fmtc.Printf("{r}Unknown command %s\n", cmd)
 		exit(1)
@@ -422,18 +439,38 @@ func statusCommand(prefs *Preferences) {
 		fingerprintValid bool
 		regionValid      bool
 		sizeValid        bool
+
+		ttlRemain         int64
+		currentUsagePrice float64
 	)
+
+	terrafarmActive := isTerrafarmActive()
+	monitorActive := isMonitorActive()
 
 	disableValidate := arg.GetB(ARG_NO_VALIDATE)
 	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
 
-	if isTerrafarmActive() {
+	if terrafarmActive {
 		farmState, err := readFarmState(getFarmStateFilePath())
 
 		if err == nil {
 			disableValidate = true
 			prefs = farmState.Preferences
 			fingerprint = farmState.Fingerprint
+		}
+	}
+
+	buildersCount := getBuildNodesCount(prefs.Template)
+	ttlHours := float64(prefs.TTL) / 60.0
+	totalUsagePrice := (ttlHours * dropletPrices[prefs.NodeSize]) * float64(buildersCount)
+
+	if monitorActive {
+		state, err := readMonitorState(getMonitorStateFilePath())
+
+		if err == nil {
+			ttlRemain = state.DestroyAfter - time.Now().Unix()
+			usageHours := ttlHours - (float64(ttlRemain) / 3600.0)
+			currentUsagePrice = (usageHours * dropletPrices[prefs.NodeSize]) * float64(buildersCount)
 		}
 	}
 
@@ -446,7 +483,11 @@ func statusCommand(prefs *Preferences) {
 
 	fmtutil.Separator(false, "TERRAFARM")
 
-	fmtc.Printf("  {*}%-16s{!} %s\n", "Template:", prefs.Template)
+	fmtc.Printf(
+		"  {*}%-16s{!} %s {s}(%s){!}\n", "Template:", prefs.Template,
+		fmtutil.Pluralize(buildersCount, "build node", "build nodes"),
+	)
+
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
 
 	printValidationMarker(tokenValid, disableValidate)
@@ -460,13 +501,19 @@ func statusCommand(prefs *Preferences) {
 
 	switch {
 	case prefs.TTL <= 0:
-		fmtc.Printf("  {*}%-16s{!} {r}disabled{!}\n", "TTL:")
+		fmtc.Printf("  {*}%-16s{!} {r}disabled{!}", "TTL:")
 	case prefs.TTL > 360:
-		fmtc.Printf("  {*}%-16s{!} {r}%s{!}\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+		fmtc.Printf("  {*}%-16s{!} {r}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
 	case prefs.TTL > 120:
-		fmtc.Printf("  {*}%-16s{!} {y}%s{!}\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+		fmtc.Printf("  {*}%-16s{!} {y}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
 	default:
-		fmtc.Printf("  {*}%-16s{!} {g}%s{!}\n", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+		fmtc.Printf("  {*}%-16s{!} {g}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+	}
+
+	if prefs.TTL <= 0 || totalUsagePrice <= 0 {
+		fmtc.NewLine()
+	} else {
+		fmtc.Printf(" {s}(~ $%.2f){!}\n", totalUsagePrice)
 	}
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Region:", prefs.Region)
@@ -486,22 +533,24 @@ func statusCommand(prefs *Preferences) {
 	if !isTerrafarmActive() {
 		fmtc.Printf("  {*}%-16s{!} {s}stopped{!}\n", "State:")
 	} else {
-		fmtc.Printf("  {*}%-16s{!} {g}works{!}\n", "State:")
+		fmtc.Printf("  {*}%-16s{!} {g}works{!}", "State:")
 
-		if isMonitorActive() {
-			state, err := readMonitorState(getMonitorStateFilePath())
+		if currentUsagePrice == 0 {
+			fmtc.NewLine()
+		} else {
+			fmtc.Printf(" {s}($%.2f){!}\n", currentUsagePrice)
+		}
 
-			if err != nil {
+		if monitorActive {
+			if ttlRemain == 0 {
 				fmtc.Printf("  {*}%-16s{!} {r}unknown{!}\n", "Monitor:")
 			} else {
-				ttlEst := state.DestroyAfter - time.Now().Unix()
-
-				if ttlEst < 0 {
+				if ttlRemain < 0 {
 					fmtc.Printf("  {*}%-16s{!} {g}works{!} {y}(destroying){!}\n", "Monitor:")
 				} else {
 					fmtc.Printf(
 						"  {*}%-16s{!} {g}works{!} {s}(%s to destroy){!}\n",
-						"Monitor:", timeutil.PrettyDuration(ttlEst),
+						"Monitor:", timeutil.PrettyDuration(ttlRemain),
 					)
 				}
 			}
@@ -557,6 +606,34 @@ func destroyCommand(prefs *Preferences) {
 	fmtutil.Separator(false)
 
 	os.Remove(getFarmStateFilePath())
+}
+
+// templatesCommand is templates command handler
+func templatesCommand() {
+	templates := fsutil.List(
+		getDataDir(), true,
+		&fsutil.ListingFilter{Perms: "DRX"},
+	)
+
+	if len(templates) == 0 {
+		printWarn("No templates found")
+		return
+	}
+
+	sort.Strings(templates)
+
+	fmtutil.Separator(false, "TEMPLATES")
+
+	for _, template := range templates {
+		buildersCount := getBuildNodesCount(template)
+
+		fmtc.Printf(
+			"  %s {s}(%s){!}\n", template,
+			fmtutil.Pluralize(buildersCount, "build node", "build nodes"),
+		)
+	}
+
+	fmtutil.Separator(false)
 }
 
 // saveFarmState collect and save farm state into file
@@ -772,6 +849,20 @@ func isMonitorActive() bool {
 	return fsutil.IsExist(path.Join("/proc", fmtc.Sprintf("%d", state.Pid)))
 }
 
+// getBuildNodesCount return number of nodes in given farm template
+func getBuildNodesCount(template string) int {
+	templateDir := path.Join(getDataDir(), template)
+
+	builders := fsutil.List(
+		templateDir, true,
+		&fsutil.ListingFilter{
+			MatchPatterns: []string{"builder*.tf"},
+		},
+	)
+
+	return len(builders)
+}
+
 // getDataDir return path to directory with terraform data
 func getDataDir() string {
 	if envMap[EV_DATA] != "" {
@@ -903,7 +994,15 @@ func exportNodeList(prefs *Preferences) error {
 		}
 	}
 
-	fmtc.Fprintln(fd, strings.Join(nodes, "\n"))
+	var result []string
+
+	for _, node := range nodes {
+		if node != "" {
+			result = append(result, node)
+		}
+	}
+
+	fmtc.Fprintln(fd, strings.Join(result, "\n"))
 
 	return nil
 }
@@ -970,6 +1069,7 @@ func showUsage() {
 	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean")
 	info.AddCommand(CMD_DESTROY, "Destroy farm droplets on DigitalOcean")
 	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferences and status")
+	info.AddCommand(CMD_TEMPLATES, "List all available farm templates")
 
 	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "ttl")
 	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
