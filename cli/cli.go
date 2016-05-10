@@ -44,7 +44,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.7.0"
+	VER  = "0.7.1"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -334,18 +334,16 @@ func startMonitor() {
 
 // processCommand execute some command
 func processCommand(cmd string) {
-	prefs := findAndReadPreferences()
-
 	scm := getSpellcheckModel()
 	cmd = scm.Correct(cmd)
 
 	switch cmd {
 	case CMD_CREATE, CMD_APPLY, CMD_START:
-		createCommand(prefs)
+		createCommand(findAndReadPreferences())
 	case CMD_DESTROY, CMD_DELETE, CMD_STOP:
-		destroyCommand(prefs)
+		destroyCommand(findAndReadPreferences())
 	case CMD_STATUS, CMD_INFO, CMD_STATE:
-		statusCommand(prefs)
+		statusCommand(findAndReadPreferences())
 	case CMD_TEMPLATES:
 		templatesCommand()
 	default:
