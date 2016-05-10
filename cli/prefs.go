@@ -10,12 +10,12 @@ package cli
 import (
 	"io/ioutil"
 	"os"
-	"strconv"
 	"strings"
 
 	"pkg.re/essentialkaos/ek.v1/arg"
 	"pkg.re/essentialkaos/ek.v1/crypto"
 	"pkg.re/essentialkaos/ek.v1/fsutil"
+	"pkg.re/essentialkaos/ek.v1/timeutil"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -88,9 +88,9 @@ func applyPreferencesFromFile(prefs *Preferences, file string) {
 
 		switch strings.ToLower(propName) {
 		case "ttl":
-			prefs.TTL = parseTTL(propVal)
+			prefs.TTL = timeutil.ParseDuration(propVal)
 
-			if prefs.TTL == -1 {
+			if prefs.TTL == 0 {
 				printError("Can't parse ttl property in %s file", file)
 			}
 
@@ -124,9 +124,9 @@ func applyPreferencesFromFile(prefs *Preferences, file string) {
 // applyPreferencesFromArgs add values from command-line arguments to preferences struct
 func applyPreferencesFromArgs(prefs *Preferences) {
 	if arg.Has(ARG_TTL) {
-		prefs.TTL = parseTTL(arg.GetS(ARG_TTL))
+		prefs.TTL = timeutil.ParseDuration(arg.GetS(ARG_TTL))
 
-		if prefs.TTL == -1 {
+		if prefs.TTL == 0 {
 			printError("Can't parse ttl property from command-line arguments")
 		}
 	}
@@ -166,9 +166,9 @@ func applyPreferencesFromArgs(prefs *Preferences) {
 
 func applyPreferencesFromEnvironment(prefs *Preferences) {
 	if envMap[EV_TTL] != "" {
-		prefs.TTL = parseTTL(envMap[EV_TTL])
+		prefs.TTL = timeutil.ParseDuration(envMap[EV_TTL])
 
-		if prefs.TTL == -1 {
+		if prefs.TTL == 0 {
 			printError("Can't parse ttl property from environment variables")
 		}
 	}
@@ -204,37 +204,6 @@ func applyPreferencesFromEnvironment(prefs *Preferences) {
 	if envMap[EV_TEMPLATE] != "" {
 		prefs.Template = envMap[EV_TEMPLATE]
 	}
-}
-
-// parseTTL parse ttl string and return as minutes
-func parseTTL(ttl string) int64 {
-	var ttlVal int64
-	var mult int64
-	var err error
-
-	switch {
-	case strings.HasSuffix(ttl, "d"):
-		ttlVal, err = strconv.ParseInt(strings.TrimRight(ttl, "d"), 10, 64)
-		mult = 1440
-
-	case strings.HasSuffix(ttl, "h"):
-		ttlVal, err = strconv.ParseInt(strings.TrimRight(ttl, "h"), 10, 64)
-		mult = 60
-
-	case strings.HasSuffix(ttl, "m"):
-		ttlVal, err = strconv.ParseInt(strings.TrimRight(ttl, "m"), 10, 64)
-		mult = 1
-
-	default:
-		ttlVal, err = strconv.ParseInt(ttl, 10, 64)
-		mult = 1
-	}
-
-	if err != nil {
-		return -1
-	}
-
-	return ttlVal * mult
 }
 
 // validatePreferences validate basic preferences
