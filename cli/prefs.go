@@ -88,7 +88,7 @@ func applyPreferencesFromFile(prefs *Preferences, file string) {
 
 		switch strings.ToLower(propName) {
 		case "ttl":
-			prefs.TTL = timeutil.ParseDuration(propVal)
+			prefs.TTL = timeutil.ParseDuration(propVal) / 60
 
 			if prefs.TTL == 0 {
 				printError("Can't parse ttl property in %s file", file)
@@ -124,7 +124,7 @@ func applyPreferencesFromFile(prefs *Preferences, file string) {
 // applyPreferencesFromArgs add values from command-line arguments to preferences struct
 func applyPreferencesFromArgs(prefs *Preferences) {
 	if arg.Has(ARG_TTL) {
-		prefs.TTL = timeutil.ParseDuration(arg.GetS(ARG_TTL))
+		prefs.TTL = timeutil.ParseDuration(arg.GetS(ARG_TTL)) / 60
 
 		if prefs.TTL == 0 {
 			printError("Can't parse ttl property from command-line arguments")
@@ -166,7 +166,7 @@ func applyPreferencesFromArgs(prefs *Preferences) {
 
 func applyPreferencesFromEnvironment(prefs *Preferences) {
 	if envMap[EV_TTL] != "" {
-		prefs.TTL = timeutil.ParseDuration(envMap[EV_TTL])
+		prefs.TTL = timeutil.ParseDuration(envMap[EV_TTL]) / 60
 
 		if prefs.TTL == 0 {
 			printError("Can't parse ttl property from environment variables")

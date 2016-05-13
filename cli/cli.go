@@ -44,7 +44,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.7.2"
+	VER  = "0.7.3"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
