@@ -44,7 +44,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.7.3"
+	VER  = "0.8.0"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -940,6 +940,27 @@ func runMonitor(ttl int64) error {
 	return cmd.Start()
 }
 
+// getNodeList return map with active build nodes
+func getNodeList(prefs *Preferences) (map[string]string, error) {
+	state, err := readTFState(getTerraformStateFilePath())
+
+	if err != nil {
+		return nil, fmtc.Errorf("Can't read state file: %v", err)
+	}
+
+	var result map[string]string
+
+	if len(state.Modules) == 0 || len(state.Modules[0].Resources) == 0 {
+		return nil, nil
+	}
+
+	for _, node := range state.Modules[0].Resources {
+		result[node.Info.Attributes.Name] = node.Info.Attributes.IP
+	}
+
+	return result, nil
+}
+
 // exportNodeList exports info about nodes for usage in rpmbuilder
 func exportNodeList(prefs *Preferences) error {
 	if fsutil.IsExist(prefs.Output) {
@@ -962,45 +983,42 @@ func exportNodeList(prefs *Preferences) error {
 
 	defer fd.Close()
 
-	state, err := readTFState(getTerraformStateFilePath())
+	var (
+		nodeNames = make([]string, 0)
+		nodeList  = make(map[string]string)
+	)
+
+	nodes, err := getNodeList(prefs)
 
 	if err != nil {
-		return fmtc.Errorf("Can't read state file: %v", err)
+		return err
 	}
 
-	nodes := make([]string, 3)
-
-	for _, node := range state.Modules[0].Resources {
+	for nodeName, nodeIP := range nodes {
 		nodeRec := fmtc.Sprintf(
 			"%s:%s@%s",
 			prefs.User,
 			prefs.Password,
-			node.Info.Attributes.IP,
+			nodeIP,
 		)
 
 		switch {
-		case strings.HasSuffix(node.Info.Attributes.Name, "-x32"):
+		case strings.HasSuffix(nodeName, "-x32"):
 			nodeRec += "~i386"
-			nodes[0] = nodeRec
 
-		case strings.HasSuffix(node.Info.Attributes.Name, "-x48"):
+		case strings.HasSuffix(nodeName, "-x48"):
 			nodeRec += "~i686"
-			nodes[1] = nodeRec
-
-		default:
-			nodes[2] = nodeRec
 		}
+
+		nodeNames = append(nodeNames, nodeName)
+		nodeList[nodeName] = nodeRec
 	}
 
-	var result []string
+	sort.Strings(nodeNames)
 
-	for _, node := range nodes {
-		if node != "" {
-			result = append(result, node)
-		}
+	for _, nodeName := range nodeNames {
+		fmtc.Fprintln(fd, nodeList[nodeName])
 	}
-
-	fmtc.Fprintln(fd, strings.Join(result, "\n"))
 
 	return nil
 }
