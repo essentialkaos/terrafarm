@@ -438,24 +438,34 @@ func statusCommand(prefs *Preferences) {
 		regionValid      bool
 		sizeValid        bool
 
+		ttlHours          float64
 		ttlRemain         int64
+		totalUsagePrice   float64
 		currentUsagePrice float64
+
+		disableValidation bool
 
 		buildersActive int
 		buildersTotal  int
+
+		fingerprint string
 	)
 
-	terrafarmActive := isTerrafarmActive()
-	monitorActive := isMonitorActive()
+	var (
+		terrafarmActive = isTerrafarmActive()
+		monitorActive   = isMonitorActive()
+	)
 
-	disableValidate := arg.GetB(ARG_NO_VALIDATE)
-	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
+	disableValidation = arg.GetB(ARG_NO_VALIDATE)
+	fingerprint, _ = getFingerprint(prefs.Key + ".pub")
+
+	buildersTotal = getBuildNodesCount(prefs.Template)
 
 	if terrafarmActive {
 		farmState, err := readFarmState(getFarmStateFilePath())
 
 		if err == nil {
-			disableValidate = true
+			disableValidation = true
 			prefs = farmState.Preferences
 			fingerprint = farmState.Fingerprint
 		}
@@ -463,9 +473,8 @@ func statusCommand(prefs *Preferences) {
 		buildersActive = len(GetActiveBuildNodes(prefs, -1))
 	}
 
-	buildersTotal = getBuildNodesCount(prefs.Template)
-	ttlHours := float64(prefs.TTL) / 60.0
-	totalUsagePrice := (ttlHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
+	ttlHours = float64(prefs.TTL) / 60.0
+	totalUsagePrice = (ttlHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
 
 	if monitorActive {
 		state, err := readMonitorState(getMonitorStateFilePath())
@@ -477,7 +486,7 @@ func statusCommand(prefs *Preferences) {
 		}
 	}
 
-	if !disableValidate {
+	if !disableValidation {
 		tokenValid = do.IsValidToken(prefs.Token)
 		fingerprintValid = do.IsFingerprintValid(prefs.Token, fingerprint)
 		regionValid = do.IsRegionValid(prefs.Token, prefs.Region)
@@ -493,14 +502,14 @@ func statusCommand(prefs *Preferences) {
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
 
-	printValidationMarker(tokenValid, disableValidate)
+	printValidationMarker(tokenValid, disableValidation)
 
 	fmtc.Printf("  {*}%-16s{!} %s\n", "Private Key:", prefs.Key)
 	fmtc.Printf("  {*}%-16s{!} %s\n", "Public Key:", prefs.Key+".pub")
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Fingerprint:", fingerprint)
 
-	printValidationMarker(fingerprintValid, disableValidate)
+	printValidationMarker(fingerprintValid, disableValidation)
 
 	switch {
 	case prefs.TTL <= 0:
@@ -521,11 +530,11 @@ func statusCommand(prefs *Preferences) {
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Region:", prefs.Region)
 
-	printValidationMarker(regionValid, disableValidate)
+	printValidationMarker(regionValid, disableValidation)
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Node size:", prefs.NodeSize)
 
-	printValidationMarker(sizeValid, disableValidate)
+	printValidationMarker(sizeValid, disableValidation)
 
 	fmtc.Printf("  {*}%-16s{!} %s\n", "User:", prefs.User)
 
