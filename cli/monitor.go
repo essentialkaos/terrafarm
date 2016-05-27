@@ -54,7 +54,7 @@ func startMonitor() {
 	for {
 		if !isTerrafarmActive() {
 			log.Info("Farm destroyed manually")
-			deleteMonitorState()
+			deleteMonitorStateFile()
 			exit(0)
 		}
 
@@ -86,14 +86,14 @@ func startMonitor() {
 
 		fsutil.Pop()
 
-		os.Remove(getFarmStateFilePath())
+		deleteFarmStateFile()
 
 		break
 	}
 
 	log.Info("Farm successfully destroyed!")
 
-	deleteMonitorState()
+	deleteMonitorStateFile()
 
 	exit(0)
 }
@@ -108,13 +108,14 @@ func getMonitorStateFilePath() string {
 	return path.Join(getDataDir(), MONITOR_STATE_FILE)
 }
 
+// deleteMonitorStateFile remote monitor state file
+func deleteMonitorStateFile() error {
+	return os.Remove(getMonitorStateFilePath())
+}
+
 // saveMonitorState save monitor state to file
 func saveMonitorState(state *MonitorState) error {
 	return jsonutil.EncodeToFile(getMonitorStateFilePath(), state)
-}
-
-func deleteMonitorState() error {
-	return os.Remove(getMonitorStateFilePath())
 }
 
 // readMonitorDestroyDate read monitor state from file

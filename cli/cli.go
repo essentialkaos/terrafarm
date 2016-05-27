@@ -549,7 +549,7 @@ func destroyCommand(prefs *Preferences) {
 
 	fmtutil.Separator(false)
 
-	os.Remove(getFarmStateFilePath())
+	deleteFarmStateFile()
 }
 
 // templatesCommand is templates command handler
@@ -822,6 +822,11 @@ func getTerraformStateFilePath() string {
 // getFarmStateFilePath return path to terrafarm state file
 func getFarmStateFilePath() string {
 	return path.Join(getDataDir(), FARM_STATE_FILE)
+}
+
+// deleteFarmStateFile remote farm state file
+func deleteFarmStateFile() error {
+	return os.Remove(getFarmStateFilePath())
 }
 
 // saveFarmState save farm state to file
