@@ -59,7 +59,7 @@ key: /home/user/.ssh/terra-farm
 output: /home/user/terrafarm-nodes.list
 region: ams3
 node-size: 8gb
-ttl: 240
+ttl: 2h
 ```
 
 Preferences file must be named as `.terrafarm` and placed in your `HOME` directory.
@@ -108,16 +108,15 @@ Usage: terrafarm <command> <options>
 
 Commands:
 
-  create        Create and run farm droplets on DigitalOcean
-  destroy       Destroy farm droplets on DigitalOcean
-  status        Show current Terrafarm preferences and status
-  templates     List all available farm templates
+  create template-name    Create and run farm droplets on DigitalOcean
+  destroy                 Destroy farm droplets on DigitalOcean
+  status                  Show current Terrafarm preferences and status
+  templates               List all available farm templates
 
 Options:
 
   --ttl, -t ttl              Max farm TTL (Time To Live)
   --output, -o file          Path to output file with access credentials
-  --template, -L name        Farm template name
   --token, -T token          DigitalOcean token
   --key, -K key-file         Path to private key
   --region, -R region        DigitalOcean region
@@ -137,6 +136,9 @@ Examples:
 
   terrafarm create --force
   Forced farm creation (without prompt)
+
+  terrafarm create c6-multiarch-fast
+  Create farm from template c6-multiarch-fast
 
   terrafarm destroy
   Destroy all farm nodes
