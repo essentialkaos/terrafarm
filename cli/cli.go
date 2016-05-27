@@ -58,7 +58,6 @@ const (
 	ARG_NODE_SIZE   = "N:node-size"
 	ARG_USER        = "U:user"
 	ARG_PASSWORD    = "P:password"
-	ARG_TEMPLATE    = "L:template"
 	ARG_DEBUG       = "D:debug"
 	ARG_MONITOR     = "m:monitor"
 	ARG_FORCE       = "f:force"
@@ -136,7 +135,6 @@ var argMap = arg.Map{
 	ARG_REGION:      &arg.V{},
 	ARG_NODE_SIZE:   &arg.V{},
 	ARG_USER:        &arg.V{},
-	ARG_TEMPLATE:    &arg.V{},
 	ARG_DEBUG:       &arg.V{Type: arg.BOOL},
 	ARG_MONITOR:     &arg.V{Type: arg.INT},
 	ARG_FORCE:       &arg.V{Type: arg.BOOL},
@@ -215,8 +213,7 @@ func Init() {
 	if arg.Has(ARG_MONITOR) {
 		startMonitor()
 	} else {
-		cmd := args[0]
-		processCommand(cmd)
+		processCommand(args[0], args[1:])
 	}
 }
 
@@ -259,13 +256,13 @@ func checkDeps() {
 }
 
 // processCommand execute some command
-func processCommand(cmd string) {
+func processCommand(cmd string, args []string) {
 	scm := getSpellcheckModel()
 	cmd = scm.Correct(cmd)
 
 	switch cmd {
 	case CMD_CREATE, CMD_APPLY, CMD_START:
-		createCommand(findAndReadPreferences())
+		createCommand(findAndReadPreferences(), args)
 	case CMD_DESTROY, CMD_DELETE, CMD_STOP:
 		destroyCommand(findAndReadPreferences())
 	case CMD_STATUS, CMD_INFO, CMD_STATE:
@@ -281,10 +278,15 @@ func processCommand(cmd string) {
 }
 
 // createCommand is create command handler
-func createCommand(prefs *Preferences) {
+func createCommand(prefs *Preferences, args []string) {
 	if isTerrafarmActive() {
 		printWarn("Terrafarm already works")
 		exit(1)
+	}
+
+	if len(args) != 0 {
+		prefs.Template = args[0]
+		validatePreferences(prefs)
 	}
 
 	statusCommand(prefs)
@@ -987,14 +989,13 @@ func exit(code int) {
 func showUsage() {
 	info := usage.NewInfo("")
 
-	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean")
+	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean", "template-name")
 	info.AddCommand(CMD_DESTROY, "Destroy farm droplets on DigitalOcean")
 	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferences and status")
 	info.AddCommand(CMD_TEMPLATES, "List all available farm templates")
 
 	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "ttl")
 	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
-	info.AddOption(ARG_TEMPLATE, "Farm template name", "name")
 	info.AddOption(ARG_TOKEN, "DigitalOcean token", "token")
 	info.AddOption(ARG_KEY, "Path to private key", "key-file")
 	info.AddOption(ARG_REGION, "DigitalOcean region", "region")
@@ -1009,6 +1010,7 @@ func showUsage() {
 
 	info.AddExample(CMD_CREATE+" --node-size 8gb --ttl 3h", "Create farm with redefined node size and TTL")
 	info.AddExample(CMD_CREATE+" --force", "Forced farm creation (without prompt)")
+	info.AddExample(CMD_CREATE+" c6-multiarch-fast", "Create farm from template c6-multiarch-fast")
 	info.AddExample(CMD_DESTROY, "Destroy all farm nodes")
 	info.AddExample(CMD_STATUS, "Show info about terrafarm")
 

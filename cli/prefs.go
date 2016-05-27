@@ -158,10 +158,6 @@ func applyPreferencesFromArgs(prefs *Preferences) {
 	if arg.Has(ARG_PASSWORD) {
 		prefs.Password = arg.GetS(ARG_PASSWORD)
 	}
-
-	if arg.Has(ARG_TEMPLATE) {
-		prefs.Template = arg.GetS(ARG_TEMPLATE)
-	}
 }
 
 func applyPreferencesFromEnvironment(prefs *Preferences) {
@@ -268,17 +264,17 @@ func validatePreferences(prefs *Preferences) {
 	templateDir := getDataDir() + "/" + prefs.Template
 
 	if !fsutil.IsExist(templateDir) {
-		printError("Directory with farm data %s is not exist", templateDir)
+		printError("Directory with template %s is not exist", prefs.Template)
 		hasErrors = true
 	} else {
 		if !fsutil.IsReadable(templateDir) {
-			printError("Directory with farm data %s is not readable", templateDir)
+			printError("Directory with template %s is not readable", prefs.Template)
 			hasErrors = true
 		}
 
 		if fsutil.IsDir(templateDir) {
 			if fsutil.IsEmptyDir(templateDir) {
-				printError("Directory with farm data %s is empty", templateDir)
+				printError("Directory with template %s is empty", prefs.Template)
 				hasErrors = true
 			}
 		} else {
