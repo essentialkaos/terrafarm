@@ -8,6 +8,7 @@ package cli
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"time"
@@ -41,11 +42,7 @@ func startMonitor() {
 		DestroyAfter: int64(arg.GetI(ARG_MONITOR)),
 	}
 
-	stateFile := getMonitorStateFilePath()
-
-	err := saveMonitorState(stateFile, state)
-
-	if err != nil {
+	if saveMonitorState(state) != nil {
 		exit(1)
 	}
 
@@ -57,7 +54,7 @@ func startMonitor() {
 	for {
 		if !isTerrafarmActive() {
 			log.Info("Farm destroyed manually")
-			os.Remove(stateFile)
+			deleteMonitorState()
 			exit(0)
 		}
 
@@ -76,7 +73,9 @@ func startMonitor() {
 			continue
 		}
 
-		fsutil.Push(path.Join(getDataDir(), prefs.Template))
+		templateDir := path.Join(getDataDir(), prefs.Template)
+
+		fsutil.Push(templateDir)
 
 		err = execTerraform(true, "destroy", vars)
 
@@ -94,7 +93,7 @@ func startMonitor() {
 
 	log.Info("Farm successfully destroyed!")
 
-	os.Remove(stateFile)
+	deleteMonitorState()
 
 	exit(0)
 }
@@ -110,15 +109,24 @@ func getMonitorStateFilePath() string {
 }
 
 // saveMonitorState save monitor state to file
-func saveMonitorState(file string, state *MonitorState) error {
-	return jsonutil.EncodeToFile(file, state)
+func saveMonitorState(state *MonitorState) error {
+	return jsonutil.EncodeToFile(getMonitorStateFilePath(), state)
+}
+
+func deleteMonitorState() error {
+	return os.Remove(getMonitorStateFilePath())
 }
 
 // readMonitorDestroyDate read monitor state from file
-func readMonitorState(file string) (*MonitorState, error) {
+func readMonitorState() (*MonitorState, error) {
 	state := &MonitorState{}
+	stateFile := getMonitorStateFilePath()
 
-	err := jsonutil.DecodeFile(file, state)
+	if !fsutil.IsExist(stateFile) {
+		return nil, fmt.Errorf("Monitor state file is not exist")
+	}
+
+	err := jsonutil.DecodeFile(stateFile, state)
 
 	if err != nil {
 		return nil, err
@@ -138,13 +146,7 @@ func runMonitor(ttl int64) error {
 
 // isMonitorActive return true is monitor process is active
 func isMonitorActive() bool {
-	stateFile := getMonitorStateFilePath()
-
-	if !fsutil.IsExist(stateFile) {
-		return false
-	}
-
-	state, err := readMonitorState(stateFile)
+	state, err := readMonitorState()
 
 	if err != nil {
 		return false

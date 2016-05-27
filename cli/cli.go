@@ -388,7 +388,7 @@ func statusCommand(prefs *Preferences) {
 	buildersTotal = getBuildNodesCount(prefs.Template)
 
 	if terrafarmActive {
-		farmState, err := readFarmState(getFarmStateFilePath())
+		farmState, err := readFarmState()
 
 		if err == nil {
 			disableValidation = true
@@ -403,7 +403,7 @@ func statusCommand(prefs *Preferences) {
 	totalUsagePrice = (ttlHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
 
 	if monitorActive {
-		state, err := readMonitorState(getMonitorStateFilePath())
+		state, err := readMonitorState()
 
 		if err == nil {
 			ttlRemain = state.DestroyAfter - time.Now().Unix()
@@ -589,7 +589,7 @@ func saveState(prefs *Preferences) {
 
 	farmState.Preferences.Token = getCryptedToken(prefs.Token)
 
-	err := saveFarmState(getFarmStateFilePath(), farmState)
+	err := saveFarmState(farmState)
 
 	if err != nil {
 		fmtc.Printf("Can't save farm state: %v\n", err)
@@ -823,15 +823,20 @@ func getFarmStateFilePath() string {
 }
 
 // saveFarmState save farm state to file
-func saveFarmState(file string, state *FarmState) error {
-	return jsonutil.EncodeToFile(file, state)
+func saveFarmState(state *FarmState) error {
+	return jsonutil.EncodeToFile(getFarmStateFilePath(), state)
 }
 
 // readFarmState read farm state from file
-func readFarmState(file string) (*FarmState, error) {
+func readFarmState() (*FarmState, error) {
 	state := &FarmState{}
+	stateFile := getFarmStateFilePath()
 
-	err := jsonutil.DecodeFile(file, state)
+	if !fsutil.IsExist(stateFile) {
+		return nil, fmtc.Errorf("Farm state file is not exist")
+	}
+
+	err := jsonutil.DecodeFile(stateFile, state)
 
 	if err != nil {
 		return nil, err
