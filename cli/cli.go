@@ -440,6 +440,9 @@ func statusCommand(prefs *Preferences) {
 
 		ttlRemain         int64
 		currentUsagePrice float64
+
+		buildersActive int
+		buildersTotal  int
 	)
 
 	terrafarmActive := isTerrafarmActive()
@@ -456,11 +459,13 @@ func statusCommand(prefs *Preferences) {
 			prefs = farmState.Preferences
 			fingerprint = farmState.Fingerprint
 		}
+
+		buildersActive = len(GetActiveBuildNodes(prefs, -1))
 	}
 
-	buildersCount := getBuildNodesCount(prefs.Template)
+	buildersTotal = getBuildNodesCount(prefs.Template)
 	ttlHours := float64(prefs.TTL) / 60.0
-	totalUsagePrice := (ttlHours * dropletPrices[prefs.NodeSize]) * float64(buildersCount)
+	totalUsagePrice := (ttlHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
 
 	if monitorActive {
 		state, err := readMonitorState(getMonitorStateFilePath())
@@ -468,7 +473,7 @@ func statusCommand(prefs *Preferences) {
 		if err == nil {
 			ttlRemain = state.DestroyAfter - time.Now().Unix()
 			usageHours := ttlHours - (float64(ttlRemain) / 3600.0)
-			currentUsagePrice = (usageHours * dropletPrices[prefs.NodeSize]) * float64(buildersCount)
+			currentUsagePrice = (usageHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
 		}
 	}
 
@@ -483,7 +488,7 @@ func statusCommand(prefs *Preferences) {
 
 	fmtc.Printf(
 		"  {*}%-16s{!} %s {s}(%s){!}\n", "Template:", prefs.Template,
-		fmtutil.Pluralize(buildersCount, "build node", "build nodes"),
+		fmtutil.Pluralize(buildersTotal, "build node", "build nodes"),
 	)
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
@@ -528,6 +533,8 @@ func statusCommand(prefs *Preferences) {
 		fmtc.Printf("  {*}%-16s{!} %s\n", "Output:", prefs.Output)
 	}
 
+	fmtc.NewLine()
+
 	if !isTerrafarmActive() {
 		fmtc.Printf("  {*}%-16s{!} {s}stopped{!}\n", "State:")
 	} else {
@@ -538,6 +545,8 @@ func statusCommand(prefs *Preferences) {
 		} else {
 			fmtc.Printf(" {s}($%.2f){!}\n", currentUsagePrice)
 		}
+
+		fmtc.Printf("  {*}%-16s{!} "+getActiveBuildBullets(buildersActive, buildersTotal)+"\n", "Active Builds:")
 
 		if monitorActive {
 			if ttlRemain == 0 {
@@ -702,6 +711,16 @@ func getCryptedToken(token string) string {
 	}
 
 	return token[:8] + "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" + token[56:]
+}
+
+// getActiveBuildBullets return colored string with bullets
+func getActiveBuildBullets(active, total int) string {
+	var result string
+
+	result += strings.Repeat("{g}•{!}", active)
+	result += strings.Repeat("{s}•{!}", total-active)
+
+	return result
 }
 
 // prefsToArgs return preferences as command line arguments for terraform
@@ -948,11 +967,11 @@ func getNodeList(prefs *Preferences) (map[string]string, error) {
 		return nil, fmtc.Errorf("Can't read state file: %v", err)
 	}
 
-	var result map[string]string
-
 	if len(state.Modules) == 0 || len(state.Modules[0].Resources) == 0 {
 		return nil, nil
 	}
+
+	result := make(map[string]string)
 
 	for _, node := range state.Modules[0].Resources {
 		result[node.Info.Attributes.Name] = node.Info.Attributes.IP
