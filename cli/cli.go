@@ -119,12 +119,6 @@ const SEPARATOR = "-------------------------------------------------------------
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
-// MonitorState contains monitor specific info
-type MonitorState struct {
-	Pid          int   `json:"pid"`
-	DestroyAfter int64 `json:"destroy_after"`
-}
-
 // FarmState contains farm specific info
 type FarmState struct {
 	Preferences *Preferences `json:"preferences"`
@@ -262,74 +256,6 @@ func checkDeps() {
 	if hasErrors {
 		exit(1)
 	}
-}
-
-// startMonitor starts monitoring process
-func startMonitor() {
-	destroyAfter := time.Unix(int64(arg.GetI(ARG_MONITOR)), 0)
-	monitorPid := os.Getpid()
-
-	state := &MonitorState{
-		Pid:          monitorPid,
-		DestroyAfter: int64(arg.GetI(ARG_MONITOR)),
-	}
-
-	stateFile := getMonitorStateFilePath()
-
-	err := saveMonitorState(stateFile, state)
-
-	if err != nil {
-		exit(1)
-	}
-
-	log.Set(getMonitorLogFilePath(), 0644)
-	log.Aux(SEPARATOR)
-	log.Aux("Terrafarm %s monitor started", VER)
-	log.Info("Farm will be destroyed after %s", timeutil.Format(destroyAfter, "%Y/%m/%d %H:%M:%S"))
-
-	for {
-		if !isTerrafarmActive() {
-			log.Info("Farm destroyed manually")
-			os.Remove(stateFile)
-			exit(0)
-		}
-
-		time.Sleep(time.Minute)
-
-		if time.Now().Unix() <= destroyAfter.Unix() {
-			continue
-		}
-
-		log.Info("Starting farm destroying...")
-
-		prefs := findAndReadPreferences()
-		vars, err := prefsToArgs(prefs, "-no-color", "-force")
-
-		if err != nil {
-			continue
-		}
-
-		fsutil.Push(path.Join(getDataDir(), prefs.Template))
-
-		err = execTerraform(true, "destroy", vars)
-
-		if err != nil {
-			log.Error("Can't destroy farm - terrafarm return error: %v", err)
-			continue
-		}
-
-		fsutil.Pop()
-
-		os.Remove(getFarmStateFilePath())
-
-		break
-	}
-
-	log.Info("Farm successfully destroyed!")
-
-	os.Remove(stateFile)
-
-	exit(0)
 }
 
 // processCommand execute some command
@@ -858,23 +784,6 @@ func isTerrafarmActive() bool {
 	return len(state.Modules[0].Resources) != 0
 }
 
-// isMonitorActive return true is monitor process is active
-func isMonitorActive() bool {
-	stateFile := getMonitorStateFilePath()
-
-	if !fsutil.IsExist(stateFile) {
-		return false
-	}
-
-	state, err := readMonitorState(stateFile)
-
-	if err != nil {
-		return false
-	}
-
-	return fsutil.IsExist(path.Join("/proc", fmtc.Sprintf("%d", state.Pid)))
-}
-
 // getBuildNodesCount return number of nodes in given farm template
 func getBuildNodesCount(template string) int {
 	templateDir := path.Join(getDataDir(), template)
@@ -913,40 +822,12 @@ func getFarmStateFilePath() string {
 	return path.Join(getDataDir(), FARM_STATE_FILE)
 }
 
-// getMonitorLogFilePath return path to monitor log file
-func getMonitorLogFilePath() string {
-	return path.Join(getDataDir(), MONITOR_LOG_FILE)
-}
-
-// getMonitorStateFilePath return path to monitor state file
-func getMonitorStateFilePath() string {
-	return path.Join(getDataDir(), MONITOR_STATE_FILE)
-}
-
-// saveMonitorState save monitor state to file
-func saveMonitorState(file string, state *MonitorState) error {
-	return jsonutil.EncodeToFile(file, state)
-}
-
-// readMonitorDestroyDate read monitor state from file
-func readMonitorState(file string) (*MonitorState, error) {
-	state := &MonitorState{}
-
-	err := jsonutil.DecodeFile(file, state)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return state, nil
-}
-
 // saveFarmState save farm state to file
 func saveFarmState(file string, state *FarmState) error {
 	return jsonutil.EncodeToFile(file, state)
 }
 
-// readMonitorDestroyDate read farm state from file
+// readFarmState read farm state from file
 func readFarmState(file string) (*FarmState, error) {
 	state := &FarmState{}
 
@@ -957,15 +838,6 @@ func readFarmState(file string) (*FarmState, error) {
 	}
 
 	return state, nil
-}
-
-// runMonitor run monitoring process
-func runMonitor(ttl int64) error {
-	destroyTime := time.Now().Unix() + (ttl * 60)
-
-	cmd := exec.Command("terrafarm", "--monitor", fmtc.Sprintf("%d", destroyTime))
-
-	return cmd.Start()
 }
 
 // getNodeList return map with active build nodes
