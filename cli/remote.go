@@ -10,8 +10,6 @@ package cli
 import (
 	"fmt"
 	"io/ioutil"
-	"strconv"
-	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -19,7 +17,7 @@ import (
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 // GetActiveBuildNodes return list of nodes with active build process
-func GetActiveBuildNodes(prefs *Preferences, maxBuildTime int) []string {
+func GetActiveBuildNodes(prefs *Preferences) []string {
 	keyData, err := ioutil.ReadFile(prefs.Key)
 
 	if err != nil {
@@ -66,20 +64,12 @@ func GetActiveBuildNodes(prefs *Preferences, maxBuildTime int) []string {
 			continue
 		}
 
-		output, err := session.Output(
+		_, err = session.Output(
 			fmt.Sprintf("stat -c '%%Y' /home/%s/.buildlock", prefs.User),
 		)
 
 		if err == nil {
-			if maxBuildTime > 0 {
-				buildStartTimestamp, _ := strconv.Atoi(string(output))
-
-				if buildStartTimestamp+maxBuildTime > int(time.Now().Unix()) {
-					result = append(result, nodeName)
-				}
-			} else {
-				result = append(result, nodeName)
-			}
+			result = append(result, nodeName)
 		}
 
 		session.Close()

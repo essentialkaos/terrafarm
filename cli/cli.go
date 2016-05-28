@@ -60,6 +60,7 @@ const (
 	ARG_PASSWORD    = "P:password"
 	ARG_DEBUG       = "D:debug"
 	ARG_MONITOR     = "m:monitor"
+	ARG_MAX_WAIT    = "w:max-wait"
 	ARG_FORCE       = "f:force"
 	ARG_NO_VALIDATE = "nv:no-validate"
 	ARG_NO_COLOR    = "nc:no-color"
@@ -85,6 +86,7 @@ const (
 const (
 	EV_DATA      = "TERRAFARM_DATA"
 	EV_TTL       = "TERRAFARM_TTL"
+	EV_MAX_WAIT  = "TERRAFARM_MAX_WAIT"
 	EV_OUTPUT    = "TERRAFARM_OUTPUT"
 	EV_TEMPLATE  = "TERRAFARM_TEMPLATE"
 	EV_TOKEN     = "TERRAFARM_TOKEN"
@@ -93,6 +95,19 @@ const (
 	EV_NODE_SIZE = "TERRAFARM_NODE_SIZE"
 	EV_USER      = "TERRAFARM_USER"
 	EV_PASSWORD  = "TERRAFARM_PASSWORD"
+)
+
+const (
+	PREFS_TTL       = "ttl"
+	PREFS_MAX_WAIT  = "max-wait"
+	PREFS_OUTPUT    = "output"
+	PREFS_TEMPLATE  = "template"
+	PREFS_TOKEN     = "token"
+	PREFS_KEY       = "key"
+	PREFS_REGION    = "region"
+	PREFS_NODE_SIZE = "node-size"
+	PREFS_USER      = "user"
+	PREFS_PASSWORD  = "password"
 )
 
 // TERRAFORM_DATA_DIR is name of directory with terraform data
@@ -135,8 +150,9 @@ var argMap = arg.Map{
 	ARG_REGION:      &arg.V{},
 	ARG_NODE_SIZE:   &arg.V{},
 	ARG_USER:        &arg.V{},
+	ARG_MAX_WAIT:    &arg.V{},
 	ARG_DEBUG:       &arg.V{Type: arg.BOOL},
-	ARG_MONITOR:     &arg.V{Type: arg.INT},
+	ARG_MONITOR:     &arg.V{},
 	ARG_FORCE:       &arg.V{Type: arg.BOOL},
 	ARG_NO_VALIDATE: &arg.V{Type: arg.BOOL},
 	ARG_NO_COLOR:    &arg.V{Type: arg.BOOL},
@@ -343,7 +359,7 @@ func createCommand(prefs *Preferences, args []string) {
 	if prefs.TTL > 0 {
 		fmtc.Println("Starting monitoring process...")
 
-		err = runMonitor(prefs.TTL)
+		err = runMonitor(prefs)
 
 		if err != nil {
 			fmtc.Printf("{r}Error while starting monitoring process: %v\n", err)
@@ -366,12 +382,15 @@ func statusCommand(prefs *Preferences) {
 		regionValid      bool
 		sizeValid        bool
 
-		ttlHours          float64
-		ttlRemain         int64
-		totalUsagePrice   float64
-		currentUsagePrice float64
+		ttlHours           float64
+		ttlRemain          int64
+		totalUsagePriceMin float64
+		totalUsagePriceMax float64
+		currentUsagePrice  float64
 
 		disableValidation bool
+
+		waitBuildComplete bool
 
 		buildersActive int
 		buildersTotal  int
@@ -387,8 +406,6 @@ func statusCommand(prefs *Preferences) {
 	disableValidation = arg.GetB(ARG_NO_VALIDATE)
 	fingerprint, _ = getFingerprint(prefs.Key + ".pub")
 
-	buildersTotal = getBuildNodesCount(prefs.Template)
-
 	if terrafarmActive {
 		farmState, err := readFarmState()
 
@@ -398,18 +415,27 @@ func statusCommand(prefs *Preferences) {
 			fingerprint = farmState.Fingerprint
 		}
 
-		buildersActive = len(GetActiveBuildNodes(prefs, -1))
+		buildersActive = len(GetActiveBuildNodes(prefs))
 	}
 
+	buildersTotal = getBuildNodesCount(prefs.Template)
+
 	ttlHours = float64(prefs.TTL) / 60.0
-	totalUsagePrice = (ttlHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
+	totalUsagePriceMin = (ttlHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
+
+	if prefs.MaxWait > 0 {
+		ttlWaitHours := float64(prefs.MaxWait) / 60.0
+		totalUsagePriceMax = totalUsagePriceMin
+		totalUsagePriceMax += (ttlWaitHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
+	}
 
 	if monitorActive {
 		state, err := readMonitorState()
 
 		if err == nil {
+			waitBuildComplete = state.MaxWait > 0
 			ttlRemain = state.DestroyAfter - time.Now().Unix()
-			usageHours := ttlHours - (float64(ttlRemain) / 3600.0)
+			usageHours := time.Since(time.Unix(state.Started, 0)).Hours()
 			currentUsagePrice = (usageHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
 		}
 	}
@@ -450,10 +476,16 @@ func statusCommand(prefs *Preferences) {
 		fmtc.Printf("  {*}%-16s{!} {g}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
 	}
 
-	if prefs.TTL <= 0 || totalUsagePrice <= 0 {
+	if prefs.MaxWait > 0 {
+		fmtc.Printf("{s} + %s wait{!}", fmtutil.Pluralize(int(prefs.MaxWait), "minute", "minutes"))
+	}
+
+	if prefs.TTL <= 0 || totalUsagePriceMin <= 0 {
 		fmtc.NewLine()
+	} else if totalUsagePriceMin > 0 && totalUsagePriceMax > 0 {
+		fmtc.Printf(" {s}(~ $%.2f - $%.2f){!}\n", totalUsagePriceMin, totalUsagePriceMax)
 	} else {
-		fmtc.Printf(" {s}(~ $%.2f){!}\n", totalUsagePrice)
+		fmtc.Printf(" {s}(~ $%.2f){!}\n", totalUsagePriceMin)
 	}
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Region:", prefs.Region)
@@ -490,7 +522,11 @@ func statusCommand(prefs *Preferences) {
 				fmtc.Printf("  {*}%-16s{!} {r}unknown{!}\n", "Monitor:")
 			} else {
 				if ttlRemain < 0 {
-					fmtc.Printf("  {*}%-16s{!} {g}works{!} {y}(destroying){!}\n", "Monitor:")
+					if waitBuildComplete {
+						fmtc.Printf("  {*}%-16s{!} {g}works{!} {y}(waiting){!}\n", "Monitor:")
+					} else {
+						fmtc.Printf("  {*}%-16s{!} {g}works{!} {y}(destroying){!}\n", "Monitor:")
+					}
 				} else {
 					fmtc.Printf(
 						"  {*}%-16s{!} {g}works{!} {s}(%s to destroy){!}\n",
@@ -700,7 +736,7 @@ func prefsToArgs(prefs *Preferences, args ...string) ([]string, error) {
 	return vars, nil
 }
 
-// exec execute command
+// execTerraform execute terraform command
 func execTerraform(logOutput bool, command string, args []string) error {
 	cmd := exec.Command("terraform", command)
 
@@ -718,10 +754,15 @@ func execTerraform(logOutput bool, command string, args []string) error {
 
 	go func() {
 		for s.Scan() {
+			text := s.Text()
+
 			if logOutput {
-				log.Info(s.Text())
+				// Skip empty line logging
+				if text != "" {
+					log.Info(text)
+				}
 			} else {
-				fmtc.Printf("  %s\n", getColoredCommandOutput(s.Text()))
+				fmtc.Printf("  %s\n", getColoredCommandOutput(text))
 			}
 		}
 	}()
@@ -867,6 +908,10 @@ func getNodeList(prefs *Preferences) (map[string]string, error) {
 	result := make(map[string]string)
 
 	for _, node := range state.Modules[0].Resources {
+		if node.Info == nil || node.Info.Attributes == nil {
+			continue
+		}
+
 		result[node.Info.Attributes.Name] = node.Info.Attributes.IP
 	}
 
@@ -999,7 +1044,8 @@ func showUsage() {
 	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferences and status")
 	info.AddCommand(CMD_TEMPLATES, "List all available farm templates")
 
-	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "ttl")
+	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "time")
+	info.AddOption(ARG_MAX_WAIT, "Max time which monitor will wait if farm have active build", "time")
 	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
 	info.AddOption(ARG_TOKEN, "DigitalOcean token", "token")
 	info.AddOption(ARG_KEY, "Path to private key", "key-file")
