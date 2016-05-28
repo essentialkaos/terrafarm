@@ -626,6 +626,7 @@ func saveState(prefs *Preferences) {
 	}
 
 	farmState.Preferences.Token = getCryptedToken(prefs.Token)
+	farmState.Preferences.Password = ""
 
 	err := saveFarmState(farmState)
 
