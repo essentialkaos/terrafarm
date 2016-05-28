@@ -10,6 +10,7 @@ package cli
 import (
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -37,6 +38,7 @@ func GetActiveBuildNodes(prefs *Preferences) []string {
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 		},
+		Timeout: time.Second,
 	}
 
 	var result []string
