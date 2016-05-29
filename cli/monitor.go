@@ -36,9 +36,10 @@ type MonitorState struct {
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
-// startMonitor starts monitoring process
-func startMonitor() {
+// startFarmMonitor starts monitoring process
+func startFarmMonitor() {
 	log.Set(getMonitorLogFilePath(), 0644)
+
 	log.Aux(SEPARATOR)
 	log.Aux("Terrafarm %s monitor started", VER)
 
@@ -216,8 +217,8 @@ func readMonitorState() (*MonitorState, error) {
 	return state, nil
 }
 
-// runMonitor run monitoring process
-func runMonitor(prefs *Preferences) error {
+// startMonitorProcess start monitoring process
+func startMonitorProcess(prefs *Preferences) error {
 	monitorPrefs := fmt.Sprintf("%d", time.Now().Unix()+(prefs.TTL*60))
 
 	if prefs.MaxWait > 0 {
@@ -229,8 +230,22 @@ func runMonitor(prefs *Preferences) error {
 	}
 
 	cmd := exec.Command("terrafarm", "--monitor", monitorPrefs)
+	err := cmd.Start()
 
-	return cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	// 0.125 * 40 = 5 sec
+	for i := 0; i < 40; i++ {
+		if isMonitorActive() {
+			return nil
+		}
+
+		time.Sleep(125 * time.Millisecond)
+	}
+
+	return fmtc.Errorf("Monitor does not start more than 5 seconds")
 }
 
 // isMonitorActive return true is monitor process is active

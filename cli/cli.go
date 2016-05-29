@@ -139,6 +139,25 @@ type FarmState struct {
 	Fingerprint string       `json:"fingerprint"`
 }
 
+// NodeInfo contains info about build node
+type NodeInfo struct {
+	Name     string
+	IP       string
+	Arch     string
+	User     string
+	Password string
+	State    uint8
+}
+
+// ////////////////////////////////////////////////////////////////////////////////// //
+
+// NodeInfoSlice is slice with node info structs
+type NodeInfoSlice []*NodeInfo
+
+func (p NodeInfoSlice) Len() int           { return len(p) }
+func (p NodeInfoSlice) Less(i, j int) bool { return p[i].Name < p[j].Name }
+func (p NodeInfoSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 // argMap is map with supported command-line arguments
@@ -227,7 +246,7 @@ func Init() {
 	checkDeps()
 
 	if arg.Has(ARG_MONITOR) {
-		startMonitor()
+		startFarmMonitor()
 	} else {
 		processCommand(args[0], args[1:])
 	}
@@ -354,19 +373,26 @@ func createCommand(prefs *Preferences, args []string) {
 		}
 
 		fmtutil.Separator(false)
+	} else {
+		fmtc.Println("Access credentials for created build nodes:\n")
+
+		printNodesInfo(prefs)
+
+		fmtutil.Separator(false)
 	}
 
 	if prefs.TTL > 0 {
-		fmtc.Println("Starting monitoring process...")
+		fmtc.Printf("Starting monitoring process... ")
 
-		err = runMonitor(prefs)
+		err = startMonitorProcess(prefs)
 
 		if err != nil {
+			fmtc.NewLine()
 			fmtc.Printf("{r}Error while starting monitoring process: %v\n", err)
 			exit(1)
 		}
 
-		fmtc.Println("{g}Monitoring process successfully started!{!}")
+		fmtc.Println("{g}DONE{!}")
 
 		fmtutil.Separator(false)
 	}
@@ -919,6 +945,57 @@ func getNodeList(prefs *Preferences) (map[string]string, error) {
 	return result, nil
 }
 
+// collectNodesInfo collect base info about build nodes
+func collectNodesInfo(prefs *Preferences) ([]*NodeInfo, error) {
+	nodes, err := getNodeList(prefs)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*NodeInfo
+
+	for nodeName, nodeIP := range nodes {
+		node := &NodeInfo{
+			Name:     nodeName,
+			IP:       nodeIP,
+			User:     prefs.User,
+			Password: prefs.Password,
+		}
+
+		switch {
+		case strings.HasSuffix(nodeName, "-x32"):
+			node.Arch = "i386"
+
+		case strings.HasSuffix(nodeName, "-x48"):
+			node.Arch = "i686"
+		}
+
+		result = append(result, node)
+	}
+
+	sort.Sort(NodeInfoSlice(result))
+
+	return result, nil
+}
+
+// printNodesInfo collect and print info about build nodes
+func printNodesInfo(prefs *Preferences) {
+	nodesInfo, err := collectNodesInfo(prefs)
+
+	if err != nil {
+		printError("Can't collect nodes info: %v", err)
+		return
+	}
+
+	for _, node := range nodesInfo {
+		fmtc.Printf(
+			"  {*}%20s{!}: ssh %s@%s {s}(Password: %s){!}\n",
+			node.Name, node.User, node.IP, node.Password,
+		)
+	}
+}
+
 // exportNodeList exports info about nodes for usage in rpmbuilder
 func exportNodeList(prefs *Preferences) error {
 	if fsutil.IsExist(prefs.Output) {
@@ -941,41 +1018,18 @@ func exportNodeList(prefs *Preferences) error {
 
 	defer fd.Close()
 
-	var (
-		nodeNames = make([]string, 0)
-		nodeList  = make(map[string]string)
-	)
-
-	nodes, err := getNodeList(prefs)
+	nodesInfo, err := collectNodesInfo(prefs)
 
 	if err != nil {
 		return err
 	}
 
-	for nodeName, nodeIP := range nodes {
-		nodeRec := fmtc.Sprintf(
-			"%s:%s@%s",
-			prefs.User,
-			prefs.Password,
-			nodeIP,
-		)
-
-		switch {
-		case strings.HasSuffix(nodeName, "-x32"):
-			nodeRec += "~i386"
-
-		case strings.HasSuffix(nodeName, "-x48"):
-			nodeRec += "~i686"
+	for _, node := range nodesInfo {
+		if node.Arch == "" {
+			fmtc.Fprintf(fd, "%s:%s@%s\n", node.User, node.Password, node.IP)
+		} else {
+			fmtc.Fprintf(fd, "%s:%s@%s~%s\n", node.User, node.Password, node.IP, node.Arch)
 		}
-
-		nodeNames = append(nodeNames, nodeName)
-		nodeList[nodeName] = nodeRec
-	}
-
-	sort.Strings(nodeNames)
-
-	for _, nodeName := range nodeNames {
-		fmtc.Fprintln(fd, nodeList[nodeName])
 	}
 
 	return nil
