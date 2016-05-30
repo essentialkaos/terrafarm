@@ -575,11 +575,26 @@ func destroyCommand(prefs *Preferences) {
 		exit(1)
 	}
 
+	activeBuildNodesNum := len(GetActiveBuildNodes(prefs))
+
 	if !arg.GetB(ARG_FORCE) {
 		fmtc.NewLine()
 
-		if !terminal.ReadAnswer("Destroy farm? (y/N)", "n") {
-			return
+		if activeBuildNodesNum != 0 {
+			yes := terminal.ReadAnswer(
+				fmtc.Sprintf(
+					"Currently farm have %s. Do you REALLY want destroy farm? (y/N)",
+					fmtutil.Pluralize(activeBuildNodesNum, "active build process", "active build processes"),
+				), "N",
+			)
+
+			if !yes {
+				return
+			}
+		} else {
+			if !terminal.ReadAnswer("Destroy farm? (y/N)", "n") {
+				return
+			}
 		}
 	}
 
