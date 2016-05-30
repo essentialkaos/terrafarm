@@ -305,7 +305,7 @@ func processCommand(cmd string, args []string) {
 	case CMD_TEMPLATES:
 		templatesCommand()
 	default:
-		fmtc.Printf("{r}Unknown command %s\n", cmd)
+		printError("Unknown command %s", cmd)
 		exit(1)
 	}
 
@@ -353,7 +353,7 @@ func createCommand(prefs *Preferences, args []string) {
 	err = execTerraform(false, "apply", vars)
 
 	if err != nil {
-		fmtc.Printf("{r}Error while executing terraform: %v\n{!}", err)
+		printError("Error while executing terraform: %v", err)
 		exit(1)
 	}
 
@@ -367,7 +367,7 @@ func createCommand(prefs *Preferences, args []string) {
 		err = exportNodeList(prefs)
 
 		if err != nil {
-			fmtc.Printf("{r}Error while exporting info: %v\n", err)
+			printError("Error while exporting info: %v", err)
 		} else {
 			fmtc.Printf("{g}Info about build nodes saved as %s{!}\n", prefs.Output)
 		}
@@ -388,7 +388,7 @@ func createCommand(prefs *Preferences, args []string) {
 
 		if err != nil {
 			fmtc.NewLine()
-			fmtc.Printf("{r}Error while starting monitoring process: %v\n", err)
+			printError("Error while starting monitoring process: %v", err)
 			exit(1)
 		}
 
@@ -618,7 +618,7 @@ func destroyCommand(prefs *Preferences) {
 	err = execTerraform(false, "destroy", vars)
 
 	if err != nil {
-		fmtc.Printf("{r}Error while executing terraform: %v\n{!}", err)
+		printError("Error while executing terraform: %v", err)
 		exit(1)
 	}
 
