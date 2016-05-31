@@ -92,14 +92,14 @@ func applyPreferencesFromFile(prefs *Preferences, file string) {
 			prefs.TTL = timeutil.ParseDuration(propVal) / 60
 
 			if prefs.TTL == 0 {
-				printError("Can't parse ttl property in %s file", file)
+				printError("Incorrect ttl property in %s file", file)
 			}
 
 		case PREFS_MAX_WAIT, "max_wait", "maxwait":
 			prefs.MaxWait = timeutil.ParseDuration(propVal) / 60
 
 			if prefs.MaxWait == 0 {
-				printError("Can't parse max-wait property in %s file", file)
+				printError("Incorrect max-wait property in %s file", file)
 			}
 
 		case PREFS_OUTPUT:
@@ -135,7 +135,7 @@ func applyPreferencesFromArgs(prefs *Preferences) {
 		prefs.TTL = timeutil.ParseDuration(arg.GetS(ARG_TTL)) / 60
 
 		if prefs.TTL == 0 {
-			printError("Can't parse ttl property from command-line arguments")
+			printError("Incorrect ttl property in command-line arguments")
 		}
 	}
 
@@ -143,7 +143,7 @@ func applyPreferencesFromArgs(prefs *Preferences) {
 		prefs.MaxWait = timeutil.ParseDuration(arg.GetS(ARG_MAX_WAIT)) / 60
 
 		if prefs.MaxWait == 0 {
-			printError("Can't parse max-wait property from command-line arguments")
+			printError("Incorrect max-wait property in command-line arguments")
 		}
 	}
 
@@ -181,7 +181,7 @@ func applyPreferencesFromEnvironment(prefs *Preferences) {
 		prefs.TTL = timeutil.ParseDuration(envMap[EV_TTL]) / 60
 
 		if prefs.TTL == 0 {
-			printError("Can't parse %s property from environment variables", EV_TTL)
+			printError("Incorrect %s property in environment variables", EV_TTL)
 		}
 	}
 
@@ -189,7 +189,7 @@ func applyPreferencesFromEnvironment(prefs *Preferences) {
 		prefs.MaxWait = timeutil.ParseDuration(envMap[EV_MAX_WAIT]) / 60
 
 		if prefs.MaxWait == 0 {
-			printError("Can't parse %s property from environment variables", EV_TTL)
+			printError("Incorrect %s property in environment variables", EV_TTL)
 		}
 	}
 

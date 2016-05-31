@@ -80,6 +80,7 @@ const (
 	CMD_INFO      = "info"
 	CMD_STATE     = "state"
 	CMD_TEMPLATES = "templates"
+	CMD_PROLONG   = "prolong"
 )
 
 // List of supported environment variables
@@ -304,6 +305,8 @@ func processCommand(cmd string, args []string) {
 		statusCommand(findAndReadPreferences())
 	case CMD_TEMPLATES:
 		templatesCommand()
+	case CMD_PROLONG:
+		prolongCommand(args)
 	default:
 		printError("Unknown command %s", cmd)
 		exit(1)
@@ -384,7 +387,7 @@ func createCommand(prefs *Preferences, args []string) {
 	if prefs.TTL > 0 {
 		fmtc.Printf("Starting monitoring process... ")
 
-		err = startMonitorProcess(prefs)
+		err = startMonitorProcess(prefs, false)
 
 		if err != nil {
 			fmtc.NewLine()
@@ -571,7 +574,7 @@ func statusCommand(prefs *Preferences) {
 // destroyCommand is destroy command handler
 func destroyCommand(prefs *Preferences) {
 	if !isTerrafarmActive() {
-		fmtc.Println("{y}Terrafarm does not works, nothing to destroy{!}")
+		printWarn("Terrafarm does not works, nothing to destroy")
 		exit(1)
 	}
 
@@ -589,10 +592,12 @@ func destroyCommand(prefs *Preferences) {
 			)
 
 			if !yes {
+				fmtc.NewLine()
 				return
 			}
 		} else {
 			if !terminal.ReadAnswer("Destroy farm? (y/N)", "n") {
+				fmtc.NewLine()
 				return
 			}
 		}
@@ -655,6 +660,149 @@ func templatesCommand() {
 	}
 
 	fmtutil.Separator(false)
+}
+
+// prolongCommand prolong farm TTL
+func prolongCommand(args []string) {
+	if !isTerrafarmActive() {
+		printWarn("Farm does not works")
+		exit(1)
+	}
+
+	if !isMonitorActive() {
+		printWarn("Monitor does not works")
+		exit(1)
+	}
+
+	if len(args) == 0 {
+		printError("You must provide prolongation time")
+		exit(1)
+	}
+
+	var (
+		ttl     int64
+		maxWait int64
+	)
+
+	if len(args) >= 1 {
+		ttl = timeutil.ParseDuration(args[0]) / 60
+
+		if ttl == 0 {
+			printError("Incorrect ttl property")
+		}
+	}
+
+	if len(args) >= 2 {
+		maxWait = timeutil.ParseDuration(args[1]) / 60
+
+		if maxWait == 0 {
+			printError("Incorrect max-wait property")
+		}
+	}
+
+	fmtc.NewLine()
+
+	var answer string
+
+	switch maxWait {
+	case 0:
+		answer = fmtc.Sprintf(
+			"Do you want to increase TTL on %s? (Y/n)",
+			timeutil.PrettyDuration(time.Duration(ttl)*time.Minute),
+		)
+
+	default:
+		answer = fmtc.Sprintf(
+			"Do you want to increase TTL on %s and set max wait to %s? (Y/n)",
+			timeutil.PrettyDuration(time.Duration(ttl)*time.Minute),
+			timeutil.PrettyDuration(time.Duration(maxWait)*time.Minute),
+		)
+	}
+
+	if !terminal.ReadAnswer(answer, "Y") {
+		fmtc.NewLine()
+		return
+	}
+
+	fmtc.NewLine()
+
+	farmState, err := readFarmState()
+
+	if err != nil {
+		printError("ERROR\n")
+		printError("Can't read farm state file: %v\n", err)
+		exit(1)
+	}
+
+	monitorState, err := readMonitorState()
+
+	if err != nil {
+		printError("ERROR\n")
+		printError("Can't read monitor state file: %v\n", err)
+		exit(1)
+	}
+
+	fmtc.Printf("Stopping monitor process... ")
+
+	err = killMonitorProcess()
+
+	if err != nil {
+		printError("ERROR\n")
+		printError("Can't stop monitor process: %v\n", err)
+		exit(1)
+	} else {
+		fmtc.Println("{g}DONE{!}")
+	}
+
+	fmtc.Printf("Updating farm state... ")
+
+	farmState.Preferences.TTL += ttl
+
+	if maxWait != 0 {
+		farmState.Preferences.MaxWait = maxWait
+	}
+
+	err = updateFarmState(farmState)
+
+	if err != nil {
+		printError("ERROR\n")
+		printError("Can't save farm state: %v\n", err)
+		exit(1)
+	} else {
+		fmtc.Println("{g}DONE{!}")
+	}
+
+	fmtc.Printf("Updating monitor state... ")
+
+	monitorState.DestroyAfter += (ttl * 60)
+
+	if maxWait != 0 {
+		monitorState.MaxWait = maxWait * 60
+	}
+
+	err = saveMonitorState(monitorState)
+
+	if err != nil {
+		printError("ERROR\n")
+		printError("Can't save monitoring state: %v\n", err)
+		exit(1)
+	} else {
+		fmtc.Println("{g}DONE{!}")
+	}
+
+	fmtc.Printf("Starting monitoring process... ")
+
+	err = startMonitorProcess(farmState.Preferences, true)
+
+	if err != nil {
+		printError("ERROR\n")
+		printError("Can't start monitoring process: %v\n", err)
+		exit(1)
+	} else {
+		fmtc.Println("{g}DONE{!}")
+	}
+
+	fmtc.NewLine()
 }
 
 // saveFarmState collect and save farm state into file
@@ -917,6 +1065,23 @@ func saveFarmState(state *FarmState) error {
 	return jsonutil.EncodeToFile(getFarmStateFilePath(), state)
 }
 
+// updateState update farm state file
+func updateFarmState(state *FarmState) error {
+	err := deleteFarmStateFile()
+
+	if err != nil {
+		return err
+	}
+
+	err = saveFarmState(state)
+
+	if err != nil {
+		fmtc.Errorf("Can't save farm state: %v", err)
+	}
+
+	return nil
+}
+
 // readFarmState read farm state from file
 func readFarmState() (*FarmState, error) {
 	state := &FarmState{}
@@ -1113,6 +1278,7 @@ func showUsage() {
 	info.AddCommand(CMD_DESTROY, "Destroy farm droplets on DigitalOcean")
 	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferences and status")
 	info.AddCommand(CMD_TEMPLATES, "List all available farm templates")
+	info.AddCommand(CMD_PROLONG, "Increase TTL or set max wait time", "ttl max-wait")
 
 	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "time")
 	info.AddOption(ARG_MAX_WAIT, "Max time which monitor will wait if farm have active build", "time")
@@ -1134,6 +1300,7 @@ func showUsage() {
 	info.AddExample(CMD_CREATE+" c6-multiarch-fast", "Create farm from template c6-multiarch-fast")
 	info.AddExample(CMD_DESTROY, "Destroy all farm nodes")
 	info.AddExample(CMD_STATUS, "Show info about terrafarm")
+	info.AddExample(CMD_PROLONG+" 1h 15m", "Increase TTL on 1 hour and set max wait to 15 minutes")
 
 	info.Render()
 }

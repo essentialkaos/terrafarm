@@ -8,7 +8,6 @@ package cli
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -21,6 +20,7 @@ import (
 	"pkg.re/essentialkaos/ek.v1/jsonutil"
 	"pkg.re/essentialkaos/ek.v1/log"
 	"pkg.re/essentialkaos/ek.v1/path"
+	"pkg.re/essentialkaos/ek.v1/signal"
 	"pkg.re/essentialkaos/ek.v1/timeutil"
 )
 
@@ -43,36 +43,99 @@ func startFarmMonitor() {
 	log.Aux(SEPARATOR)
 	log.Aux("Terrafarm %s monitor started", VER)
 
-	destroyAfter, maxWait, ok := parseMonitoringPreferences(arg.GetS(ARG_MONITOR))
-
-	if !ok {
-		log.Crit("Can't parse given monitor preferences (%s)", arg.GetS(ARG_MONITOR))
-		exit(1)
-	}
-
-	monitorPid := os.Getpid()
-
-	state := &MonitorState{
-		Pid:          monitorPid,
-		Started:      time.Now().Unix(),
-		DestroyAfter: destroyAfter.Unix(),
-		MaxWait:      maxWait,
-	}
-
-	err := saveMonitorState(state)
+	state, err := getMonitorState()
 
 	if err != nil {
-		log.Crit("Can't save monitor state to file: %v", err)
+		log.Crit(err.Error())
 		exit(1)
 	}
 
-	runMonitoringLoop(destroyAfter, maxWait)
+	signal.Handlers{
+		signal.USR1: usr1SignalHandler,
+		signal.TERM: termSignalHandler,
+	}.TrackAsync()
+
+	runMonitoringLoop(time.Unix(state.DestroyAfter, 0), state.MaxWait)
 
 	deleteFarmStateFile()
 	deleteMonitorStateFile()
 
 	log.Info("Farm successfully destroyed!")
 
+	exit(0)
+}
+
+// getMonitorState return monitor state
+func getMonitorState() (*MonitorState, error) {
+	var (
+		state *MonitorState
+		err   error
+	)
+
+	if arg.GetS(ARG_MONITOR) == "-1" {
+		if !fsutil.IsExist(getMonitorStateFilePath()) {
+			return nil, fmtc.Errorf("Can't start monitoring process: state file not exist")
+		}
+
+		state, err = readMonitorState()
+	}
+
+	if state == nil {
+		destroyAfter, maxWait, ok := parseMonitoringPreferences(arg.GetS(ARG_MONITOR))
+
+		if !ok {
+			return nil, fmtc.Errorf("Can't parse given monitor preferences (%s)", arg.GetS(ARG_MONITOR))
+		}
+
+		state = &MonitorState{
+			Started:      time.Now().Unix(),
+			DestroyAfter: destroyAfter.Unix(),
+			MaxWait:      maxWait,
+		}
+	}
+
+	state.Pid = os.Getpid()
+
+	err = saveMonitorState(state)
+
+	if err != nil {
+		return nil, fmtc.Errorf("Can't save monitor state to file: %v", err)
+	}
+
+	return state, nil
+}
+
+// killMonitorProcess kill monitor process
+func killMonitorProcess() error {
+	state, err := readMonitorState()
+
+	if err != nil {
+		return err
+	}
+
+	if !fsutil.IsExist(fmtc.Sprintf("/proc/%d", state.Pid)) {
+		return fmtc.Errorf("Monitor process with pid %d is not found", state.Pid)
+	}
+
+	err = signal.Send(state.Pid, signal.USR1)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// usr1SignalHandler is USR1 signal handler
+func usr1SignalHandler() {
+	log.Info("Got USR1 signal, restarting...")
+	exit(0)
+}
+
+// termSignalHandler is TERM signal handler
+func termSignalHandler() {
+	log.Info("Got TERM signal, shutdown...")
+	deleteMonitorStateFile()
 	exit(0)
 }
 
@@ -205,7 +268,7 @@ func readMonitorState() (*MonitorState, error) {
 	stateFile := getMonitorStateFilePath()
 
 	if !fsutil.IsExist(stateFile) {
-		return nil, fmt.Errorf("Monitor state file is not exist")
+		return nil, fmtc.Errorf("Monitor state file is not exist")
 	}
 
 	err := jsonutil.DecodeFile(stateFile, state)
@@ -217,12 +280,16 @@ func readMonitorState() (*MonitorState, error) {
 	return state, nil
 }
 
-// startMonitorProcess start monitoring process
-func startMonitorProcess(prefs *Preferences) error {
-	monitorPrefs := fmt.Sprintf("%d", time.Now().Unix()+(prefs.TTL*60))
+// startMonitorProcess start or restart monitoring process
+func startMonitorProcess(prefs *Preferences, restart bool) error {
+	monitorPrefs := "-1"
 
-	if prefs.MaxWait > 0 {
-		monitorPrefs += fmt.Sprintf("+%d", prefs.MaxWait*60)
+	if !restart {
+		monitorPrefs = fmtc.Sprintf("%d", time.Now().Unix()+(prefs.TTL*60))
+
+		if prefs.MaxWait > 0 {
+			monitorPrefs += fmtc.Sprintf("+%d", prefs.MaxWait*60)
+		}
 	}
 
 	if arg.GetB(ARG_DEBUG) {
