@@ -98,6 +98,7 @@ const (
 	EV_PASSWORD  = "TERRAFARM_PASSWORD"
 )
 
+// List of supported preferences
 const (
 	PREFS_TTL       = "ttl"
 	PREFS_MAX_WAIT  = "max-wait"
@@ -109,6 +110,14 @@ const (
 	PREFS_NODE_SIZE = "node-size"
 	PREFS_USER      = "user"
 	PREFS_PASSWORD  = "password"
+)
+
+// List of build node states
+const (
+	STATE_UNKNOWN uint8 = iota
+	STATE_INACTIVE
+	STATE_ACTIVE
+	STATE_DOWN
 )
 
 // TERRAFORM_DATA_DIR is name of directory with terraform data
@@ -421,8 +430,8 @@ func statusCommand(prefs *Preferences) {
 
 		waitBuildComplete bool
 
-		buildersActive int
-		buildersTotal  int
+		buildersTotal   int
+		buildersBullets string
 
 		fingerprint string
 	)
@@ -443,8 +452,6 @@ func statusCommand(prefs *Preferences) {
 			prefs = farmState.Preferences
 			fingerprint = farmState.Fingerprint
 		}
-
-		buildersActive = len(GetActiveBuildNodes(prefs))
 	}
 
 	buildersTotal = getBuildNodesCount(prefs.Template)
@@ -467,6 +474,8 @@ func statusCommand(prefs *Preferences) {
 			usageHours := time.Since(time.Unix(state.Started, 0)).Hours()
 			currentUsagePrice = (usageHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
 		}
+
+		buildersBullets = getBuildBullets(prefs)
 	}
 
 	if !disableValidation {
@@ -544,7 +553,7 @@ func statusCommand(prefs *Preferences) {
 			fmtc.Printf(" {s}($%.2f){!}\n", currentUsagePrice)
 		}
 
-		fmtc.Printf("  {*}%-16s{!} "+getActiveBuildBullets(buildersActive, buildersTotal)+"\n", "Active Builds:")
+		fmtc.Printf("  {*}%-16s{!} "+buildersBullets+"\n", "Nodes Statuses:")
 
 		if monitorActive {
 			if ttlRemain == 0 {
@@ -578,16 +587,16 @@ func destroyCommand(prefs *Preferences) {
 		exit(1)
 	}
 
-	activeBuildNodesNum := len(GetActiveBuildNodes(prefs))
+	activeBuildNodesCount := getActiveBuildNodesCount(prefs)
 
 	if !arg.GetB(ARG_FORCE) {
 		fmtc.NewLine()
 
-		if activeBuildNodesNum != 0 {
+		if activeBuildNodesCount != 0 {
 			yes := terminal.ReadAnswer(
 				fmtc.Sprintf(
 					"Currently farm have %s. Do you REALLY want destroy farm? (y/N)",
-					fmtutil.Pluralize(activeBuildNodesNum, "active build process", "active build processes"),
+					fmtutil.Pluralize(activeBuildNodesCount, "active build process", "active build processes"),
 				), "N",
 			)
 
@@ -876,12 +885,28 @@ func getCryptedToken(token string) string {
 	return token[:8] + "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" + token[56:]
 }
 
-// getActiveBuildBullets return colored string with bullets
-func getActiveBuildBullets(active, total int) string {
+// getBuildBullets return colored string with bullets
+func getBuildBullets(prefs *Preferences) string {
+	nodes := getBuildNodesInfo(prefs)
+
+	if len(nodes) == 0 {
+		return "{y}unknown{!}"
+	}
+
 	var result string
 
-	result += strings.Repeat("{g}•{!}", active)
-	result += strings.Repeat("{s}•{!}", total-active)
+	for _, node := range nodes {
+		switch node.State {
+		case STATE_ACTIVE:
+			result += "{g}•{!}"
+
+		case STATE_INACTIVE:
+			result += "{s}•{!}"
+
+		default:
+			result += "{r}•{!}"
+		}
+	}
 
 	return result
 }
@@ -1100,8 +1125,8 @@ func readFarmState() (*FarmState, error) {
 	return state, nil
 }
 
-// getNodeList return map with active build nodes
-func getNodeList(prefs *Preferences) (map[string]string, error) {
+// collectNodesInfo collect base info about build nodes
+func collectNodesInfo(prefs *Preferences) ([]*NodeInfo, error) {
 	state, err := readTFState(getTerraformStateFilePath())
 
 	if err != nil {
@@ -1112,42 +1137,26 @@ func getNodeList(prefs *Preferences) (map[string]string, error) {
 		return nil, nil
 	}
 
-	result := make(map[string]string)
+	var result []*NodeInfo
 
 	for _, node := range state.Modules[0].Resources {
 		if node.Info == nil || node.Info.Attributes == nil {
 			continue
 		}
 
-		result[node.Info.Attributes.Name] = node.Info.Attributes.IP
-	}
-
-	return result, nil
-}
-
-// collectNodesInfo collect base info about build nodes
-func collectNodesInfo(prefs *Preferences) ([]*NodeInfo, error) {
-	nodes, err := getNodeList(prefs)
-
-	if err != nil {
-		return nil, err
-	}
-
-	var result []*NodeInfo
-
-	for nodeName, nodeIP := range nodes {
 		node := &NodeInfo{
-			Name:     nodeName,
-			IP:       nodeIP,
+			Name:     node.Info.Attributes.Name,
+			IP:       node.Info.Attributes.IP,
 			User:     prefs.User,
 			Password: prefs.Password,
+			State:    STATE_UNKNOWN,
 		}
 
 		switch {
-		case strings.HasSuffix(nodeName, "-x32"):
+		case strings.HasSuffix(node.Name, "-x32"):
 			node.Arch = "i386"
 
-		case strings.HasSuffix(nodeName, "-x48"):
+		case strings.HasSuffix(node.Name, "-x48"):
 			node.Arch = "i686"
 		}
 

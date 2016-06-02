@@ -228,7 +228,7 @@ func isFarmMustBeDestroyed(destroyAfter, destroyNotLater time.Time) bool {
 		exit(1)
 	}
 
-	activeBuildNodes := GetActiveBuildNodes(farmState.Preferences)
+	activeBuildNodes := getActiveBuildNodesNames(farmState.Preferences)
 
 	if len(activeBuildNodes) == 0 {
 		return true

@@ -17,20 +17,20 @@ import (
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
-// GetActiveBuildNodes return list of nodes with active build process
-func GetActiveBuildNodes(prefs *Preferences) []string {
+// getBuildNodesInfo return list of with info about build nodes
+func getBuildNodesInfo(prefs *Preferences) []*NodeInfo {
 	keyData, err := ioutil.ReadFile(prefs.Key)
 
 	if err != nil {
 		fmt.Println(err.Error())
-		return []string{}
+		return []*NodeInfo{}
 	}
 
 	signer, err := ssh.ParsePrivateKey(keyData)
 
 	if err != nil {
 		fmt.Println(err.Error())
-		return []string{}
+		return []*NodeInfo{}
 	}
 
 	sshConfig := &ssh.ClientConfig{
@@ -41,27 +41,25 @@ func GetActiveBuildNodes(prefs *Preferences) []string {
 		Timeout: time.Second,
 	}
 
-	var result []string
-
-	nodes, err := getNodeList(prefs)
+	nodes, err := collectNodesInfo(prefs)
 
 	if err != nil {
 		fmt.Println(err.Error())
-		return []string{}
+		return []*NodeInfo{}
 	}
 
-	for nodeName, nodeIP := range nodes {
-		client, err := ssh.Dial("tcp", nodeIP+":22", sshConfig)
+	for _, node := range nodes {
+		client, err := ssh.Dial("tcp", node.IP+":22", sshConfig)
 
 		if err != nil {
-			fmt.Println(err.Error())
+			node.State = STATE_DOWN
 			continue
 		}
 
 		session, err := client.NewSession()
 
 		if err != nil {
-			fmt.Println(err.Error())
+			node.State = STATE_DOWN
 			client.Close()
 			continue
 		}
@@ -71,11 +69,53 @@ func GetActiveBuildNodes(prefs *Preferences) []string {
 		)
 
 		if err == nil {
-			result = append(result, nodeName)
+			node.State = STATE_ACTIVE
+		} else {
+			node.State = STATE_INACTIVE
 		}
 
 		session.Close()
 		client.Close()
+	}
+
+	return nodes
+}
+
+// getActiveBuildNodesCount return number of build nodes with active
+// build process
+func getActiveBuildNodesCount(prefs *Preferences) int {
+	nodes := getBuildNodesInfo(prefs)
+
+	if len(nodes) == 0 {
+		return 0
+	}
+
+	result := 0
+
+	for _, node := range nodes {
+		if node.State == STATE_ACTIVE {
+			result++
+		}
+	}
+
+	return result
+}
+
+// getActiveBuildNodesNames return slice with names of build nodes
+// with active build process
+func getActiveBuildNodesNames(prefs *Preferences) []string {
+	nodes := getBuildNodesInfo(prefs)
+
+	if len(nodes) == 0 {
+		return []string{}
+	}
+
+	var result []string
+
+	for _, node := range nodes {
+		if node.State == STATE_ACTIVE {
+			result = append(result, node.Name)
+		}
 	}
 
 	return result
