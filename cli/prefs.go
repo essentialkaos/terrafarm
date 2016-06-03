@@ -23,6 +23,7 @@ import (
 // Preferences contains farm preferences
 type Preferences struct {
 	TTL      int64
+	MaxWait  int64
 	Output   string
 	Token    string
 	Key      string
@@ -87,32 +88,39 @@ func applyPreferencesFromFile(prefs *Preferences, file string) {
 		propVal := strings.TrimSpace(strings.Join(propSlice[1:], ":"))
 
 		switch strings.ToLower(propName) {
-		case "ttl":
+		case PREFS_TTL:
 			prefs.TTL = timeutil.ParseDuration(propVal) / 60
 
 			if prefs.TTL == 0 {
-				printError("Can't parse ttl property in %s file", file)
+				printError("Incorrect ttl property in %s file", file)
 			}
 
-		case "output":
+		case PREFS_MAX_WAIT, "max_wait", "maxwait":
+			prefs.MaxWait = timeutil.ParseDuration(propVal) / 60
+
+			if prefs.MaxWait == 0 {
+				printError("Incorrect max-wait property in %s file", file)
+			}
+
+		case PREFS_OUTPUT:
 			prefs.Output = propVal
 
-		case "token":
+		case PREFS_TOKEN:
 			prefs.Token = propVal
 
-		case "key":
+		case PREFS_KEY:
 			prefs.Key = propVal
 
-		case "region":
+		case PREFS_REGION:
 			prefs.Region = propVal
 
-		case "node_size", "node-size":
+		case PREFS_NODE_SIZE, "node_size", "nodesize":
 			prefs.NodeSize = propVal
 
-		case "user":
+		case PREFS_USER:
 			prefs.User = propVal
 
-		case "template":
+		case PREFS_TEMPLATE:
 			prefs.Template = propVal
 
 		default:
@@ -127,7 +135,15 @@ func applyPreferencesFromArgs(prefs *Preferences) {
 		prefs.TTL = timeutil.ParseDuration(arg.GetS(ARG_TTL)) / 60
 
 		if prefs.TTL == 0 {
-			printError("Can't parse ttl property from command-line arguments")
+			printError("Incorrect ttl property in command-line arguments")
+		}
+	}
+
+	if arg.Has(ARG_MAX_WAIT) {
+		prefs.MaxWait = timeutil.ParseDuration(arg.GetS(ARG_MAX_WAIT)) / 60
+
+		if prefs.MaxWait == 0 {
+			printError("Incorrect max-wait property in command-line arguments")
 		}
 	}
 
@@ -158,10 +174,6 @@ func applyPreferencesFromArgs(prefs *Preferences) {
 	if arg.Has(ARG_PASSWORD) {
 		prefs.Password = arg.GetS(ARG_PASSWORD)
 	}
-
-	if arg.Has(ARG_TEMPLATE) {
-		prefs.Template = arg.GetS(ARG_TEMPLATE)
-	}
 }
 
 func applyPreferencesFromEnvironment(prefs *Preferences) {
@@ -169,7 +181,15 @@ func applyPreferencesFromEnvironment(prefs *Preferences) {
 		prefs.TTL = timeutil.ParseDuration(envMap[EV_TTL]) / 60
 
 		if prefs.TTL == 0 {
-			printError("Can't parse ttl property from environment variables")
+			printError("Incorrect %s property in environment variables", EV_TTL)
+		}
+	}
+
+	if envMap[EV_MAX_WAIT] != "" {
+		prefs.MaxWait = timeutil.ParseDuration(envMap[EV_MAX_WAIT]) / 60
+
+		if prefs.MaxWait == 0 {
+			printError("Incorrect %s property in environment variables", EV_TTL)
 		}
 	}
 
@@ -268,17 +288,17 @@ func validatePreferences(prefs *Preferences) {
 	templateDir := getDataDir() + "/" + prefs.Template
 
 	if !fsutil.IsExist(templateDir) {
-		printError("Directory with farm data %s is not exist", templateDir)
+		printError("Directory with template %s is not exist", prefs.Template)
 		hasErrors = true
 	} else {
 		if !fsutil.IsReadable(templateDir) {
-			printError("Directory with farm data %s is not readable", templateDir)
+			printError("Directory with template %s is not readable", prefs.Template)
 			hasErrors = true
 		}
 
 		if fsutil.IsDir(templateDir) {
 			if fsutil.IsEmptyDir(templateDir) {
-				printError("Directory with farm data %s is empty", templateDir)
+				printError("Directory with template %s is empty", prefs.Template)
 				hasErrors = true
 			}
 		} else {

@@ -1,6 +1,6 @@
-## Terrafarm
+![terrafarm Logo](https://essentialkaos.com/github/terrafarm-v1.png)
 
-`terrafarm` is utility for working with terraform based rpmbuilder farm on [DigitalOcean](https://www.digitalocean.com).
+`terrafarm` is utility for working with [Terraform](https://www.terraform.io) based [rpmbuilder](https://github.com/essentialkaos/rpmbuilder) farm on [DigitalOcean](https://www.digitalocean.com).
 
 * [Usage Demo](#usage-demo)
 * [Installation](#installation)
@@ -14,13 +14,13 @@
 * [Contributing](#contributing)
 * [License](#license)
 
-#### Usage demo
+## Usage demo
 
-[![asciicast](https://asciinema.org/a/44873.png)](https://asciinema.org/a/44873)
+[![asciicast](https://essentialkaos.com/github/terrafarm-080-1.gif)](https://asciinema.org/a/47774)
 
-#### Installation
+## Installation
 
-To build the terrafarm from scratch, make sure you have a working Go 1.5+ workspace ([instructions](https://golang.org/doc/install)), then:
+To build the terrafarm from scratch, make sure you have a working Go 1.5+ workspace ([instructions](https://golang.org/doc/install)) and latest version of [Terraform](https://www.terraform.io/downloads.html), then:
 
 ```
 go get github.com/essentialkaos/terrafarm
@@ -32,7 +32,7 @@ If you want update terrafarm to latest stable release, do:
 go get -u github.com/essentialkaos/terrafarm
 ```
 
-#### Configuration
+## Configuration
 
 `terrafarm` have three ways for farm configuration — preferences file, environment variables and command-line arguments.
 
@@ -42,7 +42,7 @@ You can use all three ways simultaneously, but in this case `terrafarm` uses dif
 2. Environment variables
 3. Command-line arguments (_highest priority_)
 
-##### Preferences file
+### Preferences file
 
 Preferences file use next format:
 
@@ -59,12 +59,12 @@ key: /home/user/.ssh/terra-farm
 output: /home/user/terrafarm-nodes.list
 region: ams3
 node-size: 8gb
-ttl: 240
+ttl: 2h
 ```
 
 Preferences file must be named as `.terrafarm` and placed in your `HOME` directory.
 
-##### Environment variables
+### Environment variables
 
 _Environment variables overwrite properties defined in preferences file._
 
@@ -72,6 +72,7 @@ You can define or redefine properties using next variables:
 
 * `TERRAFARM_DATA` - Path to directory with your own Terraform data
 * `TERRAFARM_TTL` - Max farm TTL (Time To Live)
+* `TERRAFARM_MAX_WAIT` - Max time which monitor will wait if farm have active build
 * `TERRAFARM_OUTPUT` - Path to output file with access credentials
 * `TERRAFARM_TEMPLATE` - Farm template name
 * `TERRAFARM_TOKEN` - DigitalOcean token
@@ -87,13 +88,13 @@ Example:
 TERRAFARM_DATA=/home/user/my-own-terraform-data TERRAFARM_TTL=1h terrafarm create
 ```
 
-##### Command-line arguments
+### Command-line arguments
 
 _Command-line arguments overwrite properties defined in preferences file and environment variables._
 
 All supported command-line arguments with usage examples can be found in [usage](#usage) section.
 
-#### Debugging
+## Debugging
 
 If you find an bug with Terrafarm, please include the detailed log. As a user, this information can help work around the problem and prepare fixes. 
 
@@ -101,23 +102,24 @@ First of all, you should specify `-D` or `--debug` argument with Terrafarm to pr
 
 Also keep in mind that Terrafarm works with Terraform and you should know how to debug it. We recommend to use `DEBUG` or `TRACE` values to find possible problems with Terraform. This will cause detailed logs to appear on stderr. To persist logged output you can set `TF_LOG_PATH` to write the log to a specific file.
 
-#### Usage
+## Usage
 
 ```
 Usage: terrafarm <command> <options>
 
 Commands:
 
-  create        Create and run farm droplets on DigitalOcean
-  destroy       Destroy farm droplets on DigitalOcean
-  status        Show current Terrafarm preferences and status
-  templates     List all available farm templates
+  create template-name    Create and run farm droplets on DigitalOcean
+  destroy                 Destroy farm droplets on DigitalOcean
+  status                  Show current Terrafarm preferences and status
+  templates               List all available farm templates
+  prolong ttl max-wait    Increase TTL or set max wait time
 
 Options:
 
-  --ttl, -t ttl              Max farm TTL (Time To Live)
+  --ttl, -t time             Max farm TTL (Time To Live)
+  --max-wait, -w time        Max time which monitor will wait if farm have active build
   --output, -o file          Path to output file with access credentials
-  --template, -L name        Farm template name
   --token, -T token          DigitalOcean token
   --key, -K key-file         Path to private key
   --region, -R region        DigitalOcean region
@@ -138,25 +140,31 @@ Examples:
   terrafarm create --force
   Forced farm creation (without prompt)
 
+  terrafarm create c6-multiarch-fast
+  Create farm from template c6-multiarch-fast
+
   terrafarm destroy
   Destroy all farm nodes
 
   terrafarm status
   Show info about terrafarm
 
+  terrafarm prolong 1h 15m
+  Increase TTL on 1 hour and set max wait to 15 minutes
+
 ```
 
-#### Build Status
+## Build Status
 
 | Repository | Status |
 |------------|--------|
 | Stable | [![Build Status](https://travis-ci.org/essentialkaos/terrafarm.svg?branch=master)](https://travis-ci.org/essentialkaos/terrafarm) |
 | Unstable | [![Build Status](https://travis-ci.org/essentialkaos/terrafarm.svg?branch=develop)](https://travis-ci.org/essentialkaos/terrafarm) |
 
-#### Contributing
+## Contributing
 
 Before contributing to this project please read our [Contributing Guidelines](https://github.com/essentialkaos/contributing-guidelines#contributing-guidelines).
 
-#### License
+## License
 
 [EKOL](https://essentialkaos.com/ekol)
