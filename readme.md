@@ -14,11 +14,11 @@
 * [Contributing](#contributing)
 * [License](#license)
 
-#### Usage demo
+## Usage demo
 
 [![asciicast](https://essentialkaos.com/github/terrafarm-080-1.gif)](https://asciinema.org/a/47774)
 
-#### Installation
+## Installation
 
 To build the terrafarm from scratch, make sure you have a working Go 1.5+ workspace ([instructions](https://golang.org/doc/install)) and latest version of [Terraform](https://www.terraform.io/downloads.html), then:
 
@@ -32,7 +32,7 @@ If you want update terrafarm to latest stable release, do:
 go get -u github.com/essentialkaos/terrafarm
 ```
 
-#### Configuration
+## Configuration
 
 `terrafarm` have three ways for farm configuration — preferences file, environment variables and command-line arguments.
 
@@ -42,7 +42,7 @@ You can use all three ways simultaneously, but in this case `terrafarm` uses dif
 2. Environment variables
 3. Command-line arguments (_highest priority_)
 
-##### Preferences file
+### Preferences file
 
 Preferences file use next format:
 
@@ -64,7 +64,7 @@ ttl: 2h
 
 Preferences file must be named as `.terrafarm` and placed in your `HOME` directory.
 
-##### Environment variables
+### Environment variables
 
 _Environment variables overwrite properties defined in preferences file._
 
@@ -88,13 +88,13 @@ Example:
 TERRAFARM_DATA=/home/user/my-own-terraform-data TERRAFARM_TTL=1h terrafarm create
 ```
 
-##### Command-line arguments
+### Command-line arguments
 
 _Command-line arguments overwrite properties defined in preferences file and environment variables._
 
 All supported command-line arguments with usage examples can be found in [usage](#usage) section.
 
-#### Debugging
+## Debugging
 
 If you find an bug with Terrafarm, please include the detailed log. As a user, this information can help work around the problem and prepare fixes. 
 
@@ -102,7 +102,7 @@ First of all, you should specify `-D` or `--debug` argument with Terrafarm to pr
 
 Also keep in mind that Terrafarm works with Terraform and you should know how to debug it. We recommend to use `DEBUG` or `TRACE` values to find possible problems with Terraform. This will cause detailed logs to appear on stderr. To persist logged output you can set `TF_LOG_PATH` to write the log to a specific file.
 
-#### Usage
+## Usage
 
 ```
 Usage: terrafarm <command> <options>
@@ -154,17 +154,17 @@ Examples:
 
 ```
 
-#### Build Status
+## Build Status
 
 | Repository | Status |
 |------------|--------|
 | Stable | [![Build Status](https://travis-ci.org/essentialkaos/terrafarm.svg?branch=master)](https://travis-ci.org/essentialkaos/terrafarm) |
 | Unstable | [![Build Status](https://travis-ci.org/essentialkaos/terrafarm.svg?branch=develop)](https://travis-ci.org/essentialkaos/terrafarm) |
 
-#### Contributing
+## Contributing
 
 Before contributing to this project please read our [Contributing Guidelines](https://github.com/essentialkaos/contributing-guidelines#contributing-guidelines).
 
-#### License
+## License
 
 [EKOL](https://essentialkaos.com/ekol)
