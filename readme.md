@@ -1,4 +1,4 @@
-## Terrafarm
+![terrafarm Logo](https://essentialkaos.com/github/terrafarm-v1.png)
 
 `terrafarm` is utility for working with terraform based rpmbuilder farm on [DigitalOcean](https://www.digitalocean.com).
 
