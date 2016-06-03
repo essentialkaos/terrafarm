@@ -72,6 +72,7 @@ You can define or redefine properties using next variables:
 
 * `TERRAFARM_DATA` - Path to directory with your own Terraform data
 * `TERRAFARM_TTL` - Max farm TTL (Time To Live)
+* `TERRAFARM_MAX_WAIT` - Max time which monitor will wait if farm have active build
 * `TERRAFARM_OUTPUT` - Path to output file with access credentials
 * `TERRAFARM_TEMPLATE` - Farm template name
 * `TERRAFARM_TOKEN` - DigitalOcean token
@@ -112,10 +113,12 @@ Commands:
   destroy                 Destroy farm droplets on DigitalOcean
   status                  Show current Terrafarm preferences and status
   templates               List all available farm templates
+  prolong ttl max-wait    Increase TTL or set max wait time
 
 Options:
 
-  --ttl, -t ttl              Max farm TTL (Time To Live)
+  --ttl, -t time             Max farm TTL (Time To Live)
+  --max-wait, -w time        Max time which monitor will wait if farm have active build
   --output, -o file          Path to output file with access credentials
   --token, -T token          DigitalOcean token
   --key, -K key-file         Path to private key
@@ -145,6 +148,9 @@ Examples:
 
   terrafarm status
   Show info about terrafarm
+
+  terrafarm prolong 1h 15m
+  Increase TTL on 1 hour and set max wait to 15 minutes
 
 ```
 
