@@ -959,17 +959,18 @@ func execTerraform(logOutput bool, command string, args []string) error {
 		cmd.Args = append(cmd.Args, strings.Split(strings.Join(args, " "), " ")...)
 	}
 
-	r, err := cmd.StdoutPipe()
+	reader, err := cmd.StdoutPipe()
 
 	if err != nil {
 		return fmtc.Errorf("Can't redirect output: %v", err)
 	}
 
-	s := bufio.NewScanner(r)
+	statusLines := false
+	scanner := bufio.NewScanner(reader)
 
 	go func() {
-		for s.Scan() {
-			text := s.Text()
+		for scanner.Scan() {
+			text := scanner.Text()
 
 			if logOutput {
 				// Skip empty line logging
@@ -977,6 +978,22 @@ func execTerraform(logOutput bool, command string, args []string) error {
 					log.Info(text)
 				}
 			} else {
+				if strings.Contains(text, "Still ") {
+					if !statusLines {
+						statusLines = true
+						fmtc.Printf("  {s}.{!}")
+					} else {
+						fmtc.Printf("{s}.{!}")
+					}
+
+					continue
+				} else {
+					if statusLines {
+						statusLines = false
+						fmtc.NewLine()
+					}
+				}
+
 				fmtc.Printf("  %s\n", getColoredCommandOutput(text))
 			}
 		}
