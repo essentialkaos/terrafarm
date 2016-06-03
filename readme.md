@@ -1,6 +1,6 @@
 ![terrafarm Logo](https://essentialkaos.com/github/terrafarm-v1.png)
 
-`terrafarm` is utility for working with terraform based rpmbuilder farm on [DigitalOcean](https://www.digitalocean.com).
+`terrafarm` is utility for working with [Terraform](https://www.terraform.io) based rpmbuilder farm on [DigitalOcean](https://www.digitalocean.com).
 
 * [Usage Demo](#usage-demo)
 * [Installation](#installation)
@@ -20,7 +20,7 @@
 
 #### Installation
 
-To build the terrafarm from scratch, make sure you have a working Go 1.5+ workspace ([instructions](https://golang.org/doc/install)), then:
+To build the terrafarm from scratch, make sure you have a working Go 1.5+ workspace ([instructions](https://golang.org/doc/install)) and latest version of [Terraform](https://www.terraform.io/downloads.html), then:
 
 ```
 go get github.com/essentialkaos/terrafarm
