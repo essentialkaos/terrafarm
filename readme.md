@@ -16,7 +16,7 @@
 
 #### Usage demo
 
-[![asciicast](https://essentialkaos.com/github/terrafarm-080.gif)](https://asciinema.org/a/44873)
+[![asciicast](https://essentialkaos.com/github/terrafarm-080-1.gif)](https://asciinema.org/a/47774)
 
 #### Installation
 
