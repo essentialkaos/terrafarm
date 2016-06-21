@@ -14,14 +14,14 @@ import (
 	"strings"
 	"time"
 
-	"pkg.re/essentialkaos/ek.v1/arg"
-	"pkg.re/essentialkaos/ek.v1/fmtc"
-	"pkg.re/essentialkaos/ek.v1/fsutil"
-	"pkg.re/essentialkaos/ek.v1/jsonutil"
-	"pkg.re/essentialkaos/ek.v1/log"
-	"pkg.re/essentialkaos/ek.v1/path"
-	"pkg.re/essentialkaos/ek.v1/signal"
-	"pkg.re/essentialkaos/ek.v1/timeutil"
+	"pkg.re/essentialkaos/ek.v2/arg"
+	"pkg.re/essentialkaos/ek.v2/fmtc"
+	"pkg.re/essentialkaos/ek.v2/fsutil"
+	"pkg.re/essentialkaos/ek.v2/jsonutil"
+	"pkg.re/essentialkaos/ek.v2/log"
+	"pkg.re/essentialkaos/ek.v2/path"
+	"pkg.re/essentialkaos/ek.v2/signal"
+	"pkg.re/essentialkaos/ek.v2/timeutil"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -200,6 +200,12 @@ func destroyFarmByMonitor() bool {
 	}
 
 	fsutil.Pop()
+
+	priceMessage, priceMessageComment := getUsagePriceMessage()
+
+	if priceMessage != "" {
+		log.Info("Usage price: %s (%s)", priceMessage, priceMessageComment)
+	}
 
 	return true
 }

@@ -18,19 +18,19 @@ import (
 	"strings"
 	"time"
 
-	"pkg.re/essentialkaos/ek.v1/arg"
-	"pkg.re/essentialkaos/ek.v1/env"
-	"pkg.re/essentialkaos/ek.v1/fmtc"
-	"pkg.re/essentialkaos/ek.v1/fmtutil"
-	"pkg.re/essentialkaos/ek.v1/fsutil"
-	"pkg.re/essentialkaos/ek.v1/jsonutil"
-	"pkg.re/essentialkaos/ek.v1/log"
-	"pkg.re/essentialkaos/ek.v1/path"
-	"pkg.re/essentialkaos/ek.v1/signal"
-	"pkg.re/essentialkaos/ek.v1/spellcheck"
-	"pkg.re/essentialkaos/ek.v1/terminal"
-	"pkg.re/essentialkaos/ek.v1/timeutil"
-	"pkg.re/essentialkaos/ek.v1/usage"
+	"pkg.re/essentialkaos/ek.v2/arg"
+	"pkg.re/essentialkaos/ek.v2/env"
+	"pkg.re/essentialkaos/ek.v2/fmtc"
+	"pkg.re/essentialkaos/ek.v2/fmtutil"
+	"pkg.re/essentialkaos/ek.v2/fsutil"
+	"pkg.re/essentialkaos/ek.v2/jsonutil"
+	"pkg.re/essentialkaos/ek.v2/log"
+	"pkg.re/essentialkaos/ek.v2/path"
+	"pkg.re/essentialkaos/ek.v2/signal"
+	"pkg.re/essentialkaos/ek.v2/spellcheck"
+	"pkg.re/essentialkaos/ek.v2/terminal"
+	"pkg.re/essentialkaos/ek.v2/timeutil"
+	"pkg.re/essentialkaos/ek.v2/usage"
 
 	"gopkg.in/hlandau/passlib.v1/hash/sha2crypt"
 
@@ -44,7 +44,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.8.0"
+	VER  = "0.8.1"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -224,8 +224,6 @@ func Init() {
 	args, errs := arg.Parse(argMap)
 
 	if len(errs) != 0 {
-		fmtc.NewLine()
-
 		for _, err := range errs {
 			printError(err.Error())
 		}
@@ -339,7 +337,9 @@ func createCommand(prefs *Preferences, args []string) {
 	statusCommand(prefs)
 
 	if !arg.GetB(ARG_FORCE) {
-		if !terminal.ReadAnswer("Create farm with this preferences? (y/N)", "n") {
+		yes, err := terminal.ReadAnswer("Create farm with this preferences?", "n")
+
+		if !yes || err != nil {
 			fmtc.NewLine()
 			return
 		}
@@ -593,19 +593,21 @@ func destroyCommand(prefs *Preferences) {
 		fmtc.NewLine()
 
 		if activeBuildNodesCount != 0 {
-			yes := terminal.ReadAnswer(
+			yes, err := terminal.ReadAnswer(
 				fmtc.Sprintf(
-					"Currently farm have %s. Do you REALLY want destroy farm? (y/N)",
+					"Currently farm have %s. Do you REALLY want destroy farm?",
 					fmtutil.Pluralize(activeBuildNodesCount, "active build process", "active build processes"),
-				), "N",
+				), "n",
 			)
 
-			if !yes {
+			if !yes || err != nil {
 				fmtc.NewLine()
 				return
 			}
 		} else {
-			if !terminal.ReadAnswer("Destroy farm? (y/N)", "n") {
+			yes, err := terminal.ReadAnswer("Destroy farm?", "n")
+
+			if !yes || err != nil {
 				fmtc.NewLine()
 				return
 			}
@@ -613,6 +615,8 @@ func destroyCommand(prefs *Preferences) {
 	}
 
 	fmtutil.Separator(false)
+
+	priceMessage, priceMessageComment := getUsagePriceMessage()
 
 	vars, err := prefsToArgs(prefs, "-force")
 
@@ -639,6 +643,10 @@ func destroyCommand(prefs *Preferences) {
 	fsutil.Pop()
 
 	fmtutil.Separator(false)
+
+	if priceMessage != "" {
+		fmtc.Printf("  {*}Usage price:{!} %s {s}(%s){!}\n\n", priceMessage, priceMessageComment)
+	}
 
 	deleteFarmStateFile()
 }
@@ -716,19 +724,21 @@ func prolongCommand(args []string) {
 	switch maxWait {
 	case 0:
 		answer = fmtc.Sprintf(
-			"Do you want to increase TTL on %s? (Y/n)",
+			"Do you want to increase TTL on %s?",
 			timeutil.PrettyDuration(time.Duration(ttl)*time.Minute),
 		)
 
 	default:
 		answer = fmtc.Sprintf(
-			"Do you want to increase TTL on %s and set max wait to %s? (Y/n)",
+			"Do you want to increase TTL on %s and set max wait to %s?",
 			timeutil.PrettyDuration(time.Duration(ttl)*time.Minute),
 			timeutil.PrettyDuration(time.Duration(maxWait)*time.Minute),
 		)
 	}
 
-	if !terminal.ReadAnswer(answer, "Y") {
+	yes, err := terminal.ReadAnswer(answer, "y")
+
+	if !yes || err != nil {
 		fmtc.NewLine()
 		return
 	}
@@ -1034,6 +1044,33 @@ func getColoredCommandOutput(line string) string {
 	}
 }
 
+// getUsagePriceMessage return message with usage price
+func getUsagePriceMessage() (string, string) {
+	if !isMonitorActive() {
+		return "", ""
+	}
+
+	state, err := readMonitorState()
+
+	if err != nil {
+		return "", ""
+	}
+
+	farmState, err := readFarmState()
+
+	if err != nil {
+		return "", ""
+	}
+
+	buildersTotal := getBuildNodesCount(farmState.Preferences.Template)
+	usageHours := time.Since(time.Unix(state.Started, 0)).Hours()
+	usageMinutes := int(time.Since(time.Unix(state.Started, 0)).Minutes())
+	currentUsagePrice := (usageHours * dropletPrices[farmState.Preferences.NodeSize]) * float64(buildersTotal)
+
+	return fmtc.Sprintf("$%.2f", currentUsagePrice),
+		fmtc.Sprintf("%d × %s × %d min", buildersTotal, farmState.Preferences.NodeSize, usageMinutes)
+}
+
 // addSignalInterception add interceptors for INT и TERM signals
 func addSignalInterception() {
 	signal.Handlers{
@@ -1306,7 +1343,7 @@ func showUsage() {
 	info.AddCommand(CMD_TEMPLATES, "List all available farm templates")
 	info.AddCommand(CMD_PROLONG, "Increase TTL or set max wait time", "ttl max-wait")
 
-	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "time")
+	info.AddOption(ARG_TTL, "Max farm TTL {s}(Time To Live){!}", "time")
 	info.AddOption(ARG_MAX_WAIT, "Max time which monitor will wait if farm have active build", "time")
 	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
 	info.AddOption(ARG_TOKEN, "DigitalOcean token", "token")
