@@ -82,6 +82,12 @@ const (
 	CMD_STATE     = "state"
 	CMD_TEMPLATES = "templates"
 	CMD_PROLONG   = "prolong"
+
+	CMD_CREATE_SHORTCUT    = "c"
+	CMD_DESTROY_SHORTCUT   = "d"
+	CMD_STATUS_SHORTCUT    = "s"
+	CMD_TEMPLATES_SHORTCUT = "t"
+	CMD_PROLONG_SHORTCUT   = "p"
 )
 
 // List of supported environment variables
@@ -306,15 +312,15 @@ func processCommand(cmd string, args []string) {
 	cmd = scm.Correct(cmd)
 
 	switch cmd {
-	case CMD_CREATE, CMD_APPLY, CMD_START:
+	case CMD_CREATE, CMD_APPLY, CMD_START, CMD_CREATE_SHORTCUT:
 		createCommand(findAndReadPreferences(), args)
-	case CMD_DESTROY, CMD_DELETE, CMD_STOP:
+	case CMD_DESTROY, CMD_DELETE, CMD_STOP, CMD_DESTROY_SHORTCUT:
 		destroyCommand(findAndReadPreferences())
-	case CMD_STATUS, CMD_INFO, CMD_STATE:
+	case CMD_STATUS, CMD_INFO, CMD_STATE, CMD_STATUS_SHORTCUT:
 		statusCommand(findAndReadPreferences())
-	case CMD_TEMPLATES:
+	case CMD_TEMPLATES, CMD_TEMPLATES_SHORTCUT:
 		templatesCommand()
-	case CMD_PROLONG:
+	case CMD_PROLONG, CMD_PROLONG_SHORTCUT:
 		prolongCommand(args)
 	default:
 		printError("Unknown command %s", cmd)
