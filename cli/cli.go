@@ -63,6 +63,7 @@ const (
 	ARG_MAX_WAIT    = "w:max-wait"
 	ARG_FORCE       = "f:force"
 	ARG_NO_VALIDATE = "nv:no-validate"
+	ARG_NOTIFY      = "n:notify"
 	ARG_NO_COLOR    = "nc:no-color"
 	ARG_HELP        = "h:help"
 	ARG_VER         = "v:version"
@@ -184,6 +185,7 @@ var argMap = arg.Map{
 	ARG_MONITOR:     &arg.V{},
 	ARG_FORCE:       &arg.V{Type: arg.BOOL},
 	ARG_NO_VALIDATE: &arg.V{Type: arg.BOOL},
+	ARG_NOTIFY:      &arg.V{Type: arg.BOOL},
 	ARG_NO_COLOR:    &arg.V{Type: arg.BOOL},
 	ARG_HELP:        &arg.V{Type: arg.BOOL, Alias: "u:usage"},
 	ARG_VER:         &arg.V{Type: arg.BOOL, Alias: "ver"},
@@ -410,6 +412,10 @@ func createCommand(prefs *Preferences, args []string) {
 	}
 
 	saveState(prefs)
+
+	if arg.GetB(ARG_NOTIFY) {
+		fmtc.Bell()
+	}
 }
 
 // statusCommand is status command handler
@@ -649,6 +655,10 @@ func destroyCommand(prefs *Preferences) {
 	}
 
 	deleteFarmStateFile()
+
+	if arg.GetB(ARG_NOTIFY) {
+		fmtc.Bell()
+	}
 }
 
 // templatesCommand is templates command handler
@@ -1067,8 +1077,14 @@ func getUsagePriceMessage() (string, string) {
 	usageMinutes := int(time.Since(time.Unix(state.Started, 0)).Minutes())
 	currentUsagePrice := (usageHours * dropletPrices[farmState.Preferences.NodeSize]) * float64(buildersTotal)
 
-	return fmtc.Sprintf("$%.2f", currentUsagePrice),
-		fmtc.Sprintf("%d × %s × %d min", buildersTotal, farmState.Preferences.NodeSize, usageMinutes)
+	switch buildersTotal {
+	case 1:
+		return fmtc.Sprintf("$%.2f", currentUsagePrice),
+			fmtc.Sprintf("%s × %d min", farmState.Preferences.NodeSize, usageMinutes)
+	default:
+		return fmtc.Sprintf("$%.2f", currentUsagePrice),
+			fmtc.Sprintf("%d × %s × %d min", buildersTotal, farmState.Preferences.NodeSize, usageMinutes)
+	}
 }
 
 // addSignalInterception add interceptors for INT и TERM signals
@@ -1354,6 +1370,7 @@ func showUsage() {
 	info.AddOption(ARG_PASSWORD, "Build node user password", "password")
 	info.AddOption(ARG_FORCE, "Force command execution")
 	info.AddOption(ARG_NO_VALIDATE, "Don't validate preferences")
+	info.AddOption(ARG_NOTIFY, "Ring the system bell after finishing command execution")
 	info.AddOption(ARG_NO_COLOR, "Disable colors in output")
 	info.AddOption(ARG_HELP, "Show this help message")
 	info.AddOption(ARG_VER, "Show version")
