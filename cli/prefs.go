@@ -40,7 +40,7 @@ type Preferences struct {
 func findAndReadPreferences() *Preferences {
 	prefs := &Preferences{
 		TTL:      240,
-		Region:   "ams3",
+		Region:   "fra1",
 		NodeSize: "16gb",
 		User:     "builder",
 		Password: crypto.GenPassword(18, crypto.STRENGTH_MEDIUM),
