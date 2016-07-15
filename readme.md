@@ -1,7 +1,7 @@
 <p align="center"><a href="#usage-demo">Usage demo</a> • <a href="#installation">Installation</a> • <a href="#configuration">Configuration</a> • <a href="#debugging">Debugging</a> • <a href="#usage">Usage</a> • <a href="#build-status">Build Status</a> • <a href="#contributing">Contributing</a> • <a href="#license">License</a></p>
 
 <p align="center">
-<img width="150" height="150" src="https://essentialkaos.com/github/terrafarm-v3.png"/>
+<img width="150" height="150" src="https://essentialkaos.com/github/terrafarm.png"/>
 </p>
 
 `terrafarm` is utility for working with [Terraform](https://www.terraform.io)-based [rpmbuilder](https://github.com/essentialkaos/rpmbuilder) farm on [DigitalOcean](https://www.digitalocean.com).
