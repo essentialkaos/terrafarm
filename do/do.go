@@ -9,10 +9,16 @@ package do
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 import (
-	"pkg.re/essentialkaos/ek.v2/req"
+	"pkg.re/essentialkaos/ek.v3/req"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
+
+const (
+	STATUS_OK     StatusCode = 0
+	STATUS_NOT_OK            = 1
+	STATUS_ERROR             = 2
+)
 
 // DO_API is DO API url
 const DO_API = "https://api.digitalocean.com/v2"
@@ -21,6 +27,8 @@ const DO_API = "https://api.digitalocean.com/v2"
 const USER_AGENT = "terrafarm"
 
 // ////////////////////////////////////////////////////////////////////////////////// //
+
+type StatusCode uint8
 
 type Account struct {
 	Status string `json:"status"`
@@ -57,11 +65,11 @@ type Size struct {
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 // IsValidToken return true if token valid and account is active
-func IsValidToken(token string) bool {
+func IsValidToken(token string) StatusCode {
 	resp, err := doAPIRequest(token, "/account")
 
 	if err != nil {
-		return false
+		return STATUS_ERROR
 	}
 
 	accountInfo := &AccountInfo{}
@@ -69,19 +77,23 @@ func IsValidToken(token string) bool {
 	err = resp.JSON(accountInfo)
 
 	if err != nil {
-		return false
+		return STATUS_ERROR
 	}
 
-	return accountInfo.Account.Status == "active"
+	if accountInfo.Account.Status == "active" {
+		return STATUS_OK
+	}
+
+	return STATUS_NOT_OK
 }
 
 // IsFingerprintValid return tru if provate key with given fingerprint is
 // present in Digital Ocean account
-func IsFingerprintValid(token, fingerprint string) bool {
+func IsFingerprintValid(token, fingerprint string) StatusCode {
 	resp, err := doAPIRequest(token, "/account/keys")
 
 	if err != nil {
-		return false
+		return STATUS_ERROR
 	}
 
 	keysInfo := &KeysInfo{}
@@ -89,25 +101,25 @@ func IsFingerprintValid(token, fingerprint string) bool {
 	err = resp.JSON(keysInfo)
 
 	if err != nil {
-		return false
+		return STATUS_ERROR
 	}
 
 	for _, key := range keysInfo.Keys {
 		if key.Fingerprint == fingerprint {
-			return true
+			return STATUS_OK
 		}
 	}
 
-	return false
+	return STATUS_NOT_OK
 }
 
 // IsRegionValid return true if region with given slug is present
 // on Digital Ocean
-func IsRegionValid(token, slug string) bool {
+func IsRegionValid(token, slug string) StatusCode {
 	resp, err := doAPIRequest(token, "/regions")
 
 	if err != nil {
-		return false
+		return STATUS_ERROR
 	}
 
 	regionsInfo := &RegionsInfo{}
@@ -115,25 +127,25 @@ func IsRegionValid(token, slug string) bool {
 	err = resp.JSON(regionsInfo)
 
 	if err != nil {
-		return false
+		return STATUS_ERROR
 	}
 
 	for _, region := range regionsInfo.Regions {
 		if region.Slug == slug {
-			return true
+			return STATUS_OK
 		}
 	}
 
-	return false
+	return STATUS_NOT_OK
 }
 
 // IsSizeValid return true if size with given slug is present
 // on Digital Ocean
-func IsSizeValid(token, slug string) bool {
+func IsSizeValid(token, slug string) StatusCode {
 	resp, err := doAPIRequest(token, "/sizes")
 
 	if err != nil {
-		return false
+		return STATUS_ERROR
 	}
 
 	sizesInfo := &SizesInfo{}
@@ -141,16 +153,16 @@ func IsSizeValid(token, slug string) bool {
 	err = resp.JSON(sizesInfo)
 
 	if err != nil {
-		return false
+		return STATUS_ERROR
 	}
 
 	for _, size := range sizesInfo.Sizes {
 		if size.Slug == slug {
-			return true
+			return STATUS_OK
 		}
 	}
 
-	return false
+	return STATUS_NOT_OK
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //

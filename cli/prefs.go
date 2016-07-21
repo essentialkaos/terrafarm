@@ -12,10 +12,10 @@ import (
 	"os"
 	"strings"
 
-	"pkg.re/essentialkaos/ek.v2/arg"
-	"pkg.re/essentialkaos/ek.v2/crypto"
-	"pkg.re/essentialkaos/ek.v2/fsutil"
-	"pkg.re/essentialkaos/ek.v2/timeutil"
+	"pkg.re/essentialkaos/ek.v3/arg"
+	"pkg.re/essentialkaos/ek.v3/crypto"
+	"pkg.re/essentialkaos/ek.v3/fsutil"
+	"pkg.re/essentialkaos/ek.v3/timeutil"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //

@@ -18,19 +18,21 @@ import (
 	"strings"
 	"time"
 
-	"pkg.re/essentialkaos/ek.v2/arg"
-	"pkg.re/essentialkaos/ek.v2/env"
-	"pkg.re/essentialkaos/ek.v2/fmtc"
-	"pkg.re/essentialkaos/ek.v2/fmtutil"
-	"pkg.re/essentialkaos/ek.v2/fsutil"
-	"pkg.re/essentialkaos/ek.v2/jsonutil"
-	"pkg.re/essentialkaos/ek.v2/log"
-	"pkg.re/essentialkaos/ek.v2/path"
-	"pkg.re/essentialkaos/ek.v2/signal"
-	"pkg.re/essentialkaos/ek.v2/spellcheck"
-	"pkg.re/essentialkaos/ek.v2/terminal"
-	"pkg.re/essentialkaos/ek.v2/timeutil"
-	"pkg.re/essentialkaos/ek.v2/usage"
+	"pkg.re/essentialkaos/ek.v3/arg"
+	"pkg.re/essentialkaos/ek.v3/env"
+	"pkg.re/essentialkaos/ek.v3/fmtc"
+	"pkg.re/essentialkaos/ek.v3/fmtutil"
+	"pkg.re/essentialkaos/ek.v3/fsutil"
+	"pkg.re/essentialkaos/ek.v3/jsonutil"
+	"pkg.re/essentialkaos/ek.v3/log"
+	"pkg.re/essentialkaos/ek.v3/path"
+	"pkg.re/essentialkaos/ek.v3/pluralize"
+	"pkg.re/essentialkaos/ek.v3/req"
+	"pkg.re/essentialkaos/ek.v3/signal"
+	"pkg.re/essentialkaos/ek.v3/spellcheck"
+	"pkg.re/essentialkaos/ek.v3/terminal"
+	"pkg.re/essentialkaos/ek.v3/timeutil"
+	"pkg.re/essentialkaos/ek.v3/usage"
 
 	"gopkg.in/hlandau/passlib.v1/hash/sha2crypt"
 
@@ -44,7 +46,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.8.1"
+	VER  = "0.9.0"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -258,6 +260,8 @@ func Init() {
 		return
 	}
 
+	req.RequestTimeout = 2.0
+
 	checkEnv()
 	checkDeps()
 
@@ -373,7 +377,7 @@ func createCommand(prefs *Preferences, args []string) {
 	err = execTerraform(false, "apply", vars)
 
 	if err != nil {
-		printError("Error while executing terraform: %v", err)
+		printError("\nError while executing terraform: %v", err)
 		exit(1)
 	}
 
@@ -427,10 +431,10 @@ func createCommand(prefs *Preferences, args []string) {
 // statusCommand is status command handler
 func statusCommand(prefs *Preferences) {
 	var (
-		tokenValid       bool
-		fingerprintValid bool
-		regionValid      bool
-		sizeValid        bool
+		tokenValid       do.StatusCode
+		fingerprintValid do.StatusCode
+		regionValid      do.StatusCode
+		sizeValid        do.StatusCode
 
 		ttlHours           float64
 		ttlRemain          int64
@@ -501,7 +505,7 @@ func statusCommand(prefs *Preferences) {
 
 	fmtc.Printf(
 		"  {*}%-16s{!} %s {s}(%s){!}\n", "Template:", prefs.Template,
-		fmtutil.Pluralize(buildersTotal, "build node", "build nodes"),
+		pluralize.Pluralize(buildersTotal, "build node", "build nodes"),
 	)
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
@@ -527,7 +531,7 @@ func statusCommand(prefs *Preferences) {
 	}
 
 	if prefs.MaxWait > 0 {
-		fmtc.Printf("{s} + %s wait{!}", fmtutil.Pluralize(int(prefs.MaxWait), "minute", "minutes"))
+		fmtc.Printf("{s} + %s wait{!}", pluralize.Pluralize(int(prefs.MaxWait), "minute", "minutes"))
 	}
 
 	if prefs.TTL <= 0 || totalUsagePriceMin <= 0 {
@@ -608,7 +612,7 @@ func destroyCommand(prefs *Preferences) {
 			yes, err := terminal.ReadAnswer(
 				fmtc.Sprintf(
 					"Currently farm have %s. Do you REALLY want destroy farm?",
-					fmtutil.Pluralize(activeBuildNodesCount, "active build process", "active build processes"),
+					pluralize.Pluralize(activeBuildNodesCount, "active build process", "active build processes"),
 				), "n",
 			)
 
@@ -648,7 +652,7 @@ func destroyCommand(prefs *Preferences) {
 	err = execTerraform(false, "destroy", vars)
 
 	if err != nil {
-		printError("Error while executing terraform: %v", err)
+		printError("\nError while executing terraform: %v", err)
 		exit(1)
 	}
 
@@ -688,7 +692,7 @@ func templatesCommand() {
 
 		fmtc.Printf(
 			"  %s {s}(%s){!}\n", template,
-			fmtutil.Pluralize(buildersCount, "build node", "build nodes"),
+			pluralize.Pluralize(buildersCount, "build node", "build nodes"),
 		)
 	}
 
@@ -860,14 +864,16 @@ func saveState(prefs *Preferences) {
 }
 
 // printValidationMarker print validation mark
-func printValidationMarker(value, disableValidate bool) {
+func printValidationMarker(value do.StatusCode, disableValidate bool) {
 	switch {
 	case disableValidate == true:
 		fmtc.Printf("\n")
-	case value == true:
+	case value == do.STATUS_OK:
 		fmtc.Printf(" {g}✔{!}\n")
-	case value == false:
+	case value == do.STATUS_NOT_OK:
 		fmtc.Printf(" {r}✘{!}\n")
+	case value == do.STATUS_ERROR:
+		fmtc.Printf(" {y*}?{!}\n")
 	}
 }
 
