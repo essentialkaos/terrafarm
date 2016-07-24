@@ -1,6 +1,6 @@
 resource "digitalocean_droplet" "builder-x64" {
   image = "centos-6-5-x64"
-  name = "centos6-builder-x64"
+  name = "terrafarm-c6-x64"
   region = "${var.region}"
   size = "${var.node_size}"
   ssh_keys = [

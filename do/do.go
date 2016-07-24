@@ -9,6 +9,10 @@ package do
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	"pkg.re/essentialkaos/ek.v3/req"
 )
 
@@ -62,11 +66,25 @@ type Size struct {
 	Slug string `json:"slug"`
 }
 
+type DropletsInfo struct {
+	Droplets []*Droplet `json:"droplets"`
+}
+
+type Droplet struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 // IsValidToken return true if token valid and account is active
 func IsValidToken(token string) StatusCode {
-	resp, err := doAPIRequest(token, "/account")
+	resp, err := req.Request{
+		URL:         DO_API + "/account",
+		UserAgent:   USER_AGENT,
+		ContentType: "application/json",
+		Headers:     req.Headers{"Authorization": "Bearer " + token},
+	}.Get()
 
 	if err != nil {
 		return STATUS_ERROR
@@ -90,7 +108,12 @@ func IsValidToken(token string) StatusCode {
 // IsFingerprintValid return tru if provate key with given fingerprint is
 // present in Digital Ocean account
 func IsFingerprintValid(token, fingerprint string) StatusCode {
-	resp, err := doAPIRequest(token, "/account/keys")
+	resp, err := req.Request{
+		URL:         DO_API + "/account/keys",
+		UserAgent:   USER_AGENT,
+		ContentType: "application/json",
+		Headers:     req.Headers{"Authorization": "Bearer " + token},
+	}.Get()
 
 	if err != nil {
 		return STATUS_ERROR
@@ -116,7 +139,12 @@ func IsFingerprintValid(token, fingerprint string) StatusCode {
 // IsRegionValid return true if region with given slug is present
 // on Digital Ocean
 func IsRegionValid(token, slug string) StatusCode {
-	resp, err := doAPIRequest(token, "/regions")
+	resp, err := req.Request{
+		URL:         DO_API + "/regions",
+		UserAgent:   USER_AGENT,
+		ContentType: "application/json",
+		Headers:     req.Headers{"Authorization": "Bearer " + token},
+	}.Get()
 
 	if err != nil {
 		return STATUS_ERROR
@@ -142,7 +170,12 @@ func IsRegionValid(token, slug string) StatusCode {
 // IsSizeValid return true if size with given slug is present
 // on Digital Ocean
 func IsSizeValid(token, slug string) StatusCode {
-	resp, err := doAPIRequest(token, "/sizes")
+	resp, err := req.Request{
+		URL:         DO_API + "/sizes",
+		UserAgent:   USER_AGENT,
+		ContentType: "application/json",
+		Headers:     req.Headers{"Authorization": "Bearer " + token},
+	}.Get()
 
 	if err != nil {
 		return STATUS_ERROR
@@ -165,16 +198,79 @@ func IsSizeValid(token, slug string) StatusCode {
 	return STATUS_NOT_OK
 }
 
-// ////////////////////////////////////////////////////////////////////////////////// //
+// DestroyTerrafarmDroplets destroy terrafarm droplets
+func DestroyTerrafarmDroplets(token string) error {
+	droplets, err := GetTerrafarmDropletsList(token)
 
-// doAPIRequest execute request to DO API
-func doAPIRequest(token, url string) (*req.Response, error) {
-	return req.Request{
-		URL:         DO_API + url,
+	if err != nil {
+		return err
+	}
+
+	if len(droplets) == 0 {
+		return nil
+	}
+
+	for dropletName, dropletID := range droplets {
+		resp, err := req.Request{
+			URL:         DO_API + "/droplets/" + strconv.Itoa(dropletID),
+			UserAgent:   USER_AGENT,
+			ContentType: "application/json",
+			Headers:     req.Headers{"Authorization": "Bearer " + token},
+		}.Delete()
+
+		if err != nil {
+			return fmt.Errorf("Can't send request to DigitalOcean API: %v", err)
+		}
+
+		if resp.StatusCode != 204 {
+			return fmt.Errorf(
+				"Can't destroy droplet %s - DigitalOcean return status code %d",
+				dropletName, resp.StatusCode,
+			)
+		}
+	}
+
+	return nil
+}
+
+// GetTerrafarmDropletsList return map name->id
+func GetTerrafarmDropletsList(token string) (map[string]int, error) {
+	var result = make(map[string]int)
+
+	resp, err := req.Request{
+		URL:         DO_API + "/droplets",
 		UserAgent:   USER_AGENT,
 		ContentType: "application/json",
-		Headers: map[string]string{
+
+		Query: req.Query{
+			"page":     "1",
+			"per_page": "999",
+		},
+
+		Headers: req.Headers{
 			"Authorization": "Bearer " + token,
 		},
 	}.Get()
+
+	if err != nil {
+		return result, fmt.Errorf("Can't fetch droplets list from DigitalOcean API: %v", err)
+	}
+
+	dropletsInfo := &DropletsInfo{}
+
+	err = resp.JSON(dropletsInfo)
+
+	if err != nil {
+		return result, fmt.Errorf("Can't decode DigitalOcean API response: %v", err)
+	}
+
+	for _, droplet := range dropletsInfo.Droplets {
+		if strings.HasPrefix(strings.ToLower(droplet.Name), "terrafarm") {
+			result[droplet.Name] = droplet.ID
+		}
+	}
+
+	return result, nil
 }
+
+// ////////////////////////////////////////////////////////////////////////////////// //

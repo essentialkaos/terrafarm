@@ -15,6 +15,7 @@ import (
 	"pkg.re/essentialkaos/ek.v3/arg"
 	"pkg.re/essentialkaos/ek.v3/crypto"
 	"pkg.re/essentialkaos/ek.v3/fsutil"
+	"pkg.re/essentialkaos/ek.v3/terminal"
 	"pkg.re/essentialkaos/ek.v3/timeutil"
 )
 
@@ -92,14 +93,14 @@ func applyPreferencesFromFile(prefs *Preferences, file string) {
 			prefs.TTL = timeutil.ParseDuration(propVal) / 60
 
 			if prefs.TTL == 0 {
-				printError("Incorrect ttl property in %s file", file)
+				terminal.PrintErrorMessage("Incorrect ttl property in %s file", file)
 			}
 
 		case PREFS_MAX_WAIT, "max_wait", "maxwait":
 			prefs.MaxWait = timeutil.ParseDuration(propVal) / 60
 
 			if prefs.MaxWait == 0 {
-				printError("Incorrect max-wait property in %s file", file)
+				terminal.PrintErrorMessage("Incorrect max-wait property in %s file", file)
 			}
 
 		case PREFS_OUTPUT:
@@ -124,7 +125,7 @@ func applyPreferencesFromFile(prefs *Preferences, file string) {
 			prefs.Template = propVal
 
 		default:
-			printWarn("Unknown property %s in %s file", propName, file)
+			terminal.PrintWarnMessage("Unknown property %s in %s file", propName, file)
 		}
 	}
 }
@@ -135,7 +136,7 @@ func applyPreferencesFromArgs(prefs *Preferences) {
 		prefs.TTL = timeutil.ParseDuration(arg.GetS(ARG_TTL)) / 60
 
 		if prefs.TTL == 0 {
-			printError("Incorrect ttl property in command-line arguments")
+			terminal.PrintErrorMessage("Incorrect ttl property in command-line arguments")
 		}
 	}
 
@@ -143,7 +144,7 @@ func applyPreferencesFromArgs(prefs *Preferences) {
 		prefs.MaxWait = timeutil.ParseDuration(arg.GetS(ARG_MAX_WAIT)) / 60
 
 		if prefs.MaxWait == 0 {
-			printError("Incorrect max-wait property in command-line arguments")
+			terminal.PrintErrorMessage("Incorrect max-wait property in command-line arguments")
 		}
 	}
 
@@ -181,7 +182,7 @@ func applyPreferencesFromEnvironment(prefs *Preferences) {
 		prefs.TTL = timeutil.ParseDuration(envMap[EV_TTL]) / 60
 
 		if prefs.TTL == 0 {
-			printError("Incorrect %s property in environment variables", EV_TTL)
+			terminal.PrintErrorMessage("Incorrect %s property in environment variables", EV_TTL)
 		}
 	}
 
@@ -189,7 +190,7 @@ func applyPreferencesFromEnvironment(prefs *Preferences) {
 		prefs.MaxWait = timeutil.ParseDuration(envMap[EV_MAX_WAIT]) / 60
 
 		if prefs.MaxWait == 0 {
-			printError("Incorrect %s property in environment variables", EV_TTL)
+			terminal.PrintErrorMessage("Incorrect %s property in environment variables", EV_TTL)
 		}
 	}
 
@@ -231,56 +232,56 @@ func validatePreferences(prefs *Preferences) {
 	hasErrors := false
 
 	if prefs.Token == "" {
-		printError("Property token must be set")
+		terminal.PrintErrorMessage("Property token must be set")
 		hasErrors = true
 	}
 
 	if prefs.Region == "" {
-		printError("Property region must be set")
+		terminal.PrintErrorMessage("Property region must be set")
 		hasErrors = true
 	}
 
 	if prefs.NodeSize == "" {
-		printError("Property node-size must be set")
+		terminal.PrintErrorMessage("Property node-size must be set")
 		hasErrors = true
 	}
 
 	if prefs.User == "" {
-		printError("Property user must be set")
+		terminal.PrintErrorMessage("Property user must be set")
 		hasErrors = true
 	}
 
 	if prefs.Key == "" {
-		printError("Property key must be set")
+		terminal.PrintErrorMessage("Property key must be set")
 		hasErrors = true
 	} else {
 		if !fsutil.IsExist(prefs.Key) {
-			printError("Private key file %s does not exits", prefs.Key)
+			terminal.PrintErrorMessage("Private key file %s does not exits", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsReadable(prefs.Key) {
-			printError("Private key file %s must be readable", prefs.Key)
+			terminal.PrintErrorMessage("Private key file %s must be readable", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsNonEmpty(prefs.Key) {
-			printError("Private key file %s does not contain any data", prefs.Key)
+			terminal.PrintErrorMessage("Private key file %s does not contain any data", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsExist(prefs.Key + ".pub") {
-			printError("Public key file %s.pub does not exits", prefs.Key)
+			terminal.PrintErrorMessage("Public key file %s.pub does not exits", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsReadable(prefs.Key + ".pub") {
-			printError("Public key file %s.pub must be readable", prefs.Key)
+			terminal.PrintErrorMessage("Public key file %s.pub must be readable", prefs.Key)
 			hasErrors = true
 		}
 
 		if !fsutil.IsNonEmpty(prefs.Key + ".pub") {
-			printError("Public key file %s.pub does not contain any data", prefs.Key)
+			terminal.PrintErrorMessage("Public key file %s.pub does not contain any data", prefs.Key)
 			hasErrors = true
 		}
 	}
@@ -288,21 +289,21 @@ func validatePreferences(prefs *Preferences) {
 	templateDir := getDataDir() + "/" + prefs.Template
 
 	if !fsutil.IsExist(templateDir) {
-		printError("Directory with template %s is not exist", prefs.Template)
+		terminal.PrintErrorMessage("Directory with template %s is not exist", prefs.Template)
 		hasErrors = true
 	} else {
 		if !fsutil.IsReadable(templateDir) {
-			printError("Directory with template %s is not readable", prefs.Template)
+			terminal.PrintErrorMessage("Directory with template %s is not readable", prefs.Template)
 			hasErrors = true
 		}
 
 		if fsutil.IsDir(templateDir) {
 			if fsutil.IsEmptyDir(templateDir) {
-				printError("Directory with template %s is empty", prefs.Template)
+				terminal.PrintErrorMessage("Directory with template %s is empty", prefs.Template)
 				hasErrors = true
 			}
 		} else {
-			printError("Target %s is not a directory", templateDir)
+			terminal.PrintErrorMessage("Target %s is not a directory", templateDir)
 			hasErrors = true
 		}
 	}
