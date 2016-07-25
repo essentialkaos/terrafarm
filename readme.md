@@ -1,22 +1,14 @@
-![terrafarm Logo](https://essentialkaos.com/github/terrafarm-v1.png)
+<p align="center"><a href="#usage-demo">Usage demo</a> • <a href="#installation">Installation</a> • <a href="#configuration">Configuration</a> • <a href="#debugging">Debugging</a> • <a href="#usage">Usage</a> • <a href="#build-status">Build Status</a> • <a href="#contributing">Contributing</a> • <a href="#license">License</a></p>
 
-`terrafarm` is utility for working with [Terraform](https://www.terraform.io) based [rpmbuilder](https://github.com/essentialkaos/rpmbuilder) farm on [DigitalOcean](https://www.digitalocean.com).
+<p align="center">
+<img width="200" height="200" src="https://essentialkaos.com/github/terrafarm.png"/>
+</p>
 
-* [Usage Demo](#usage-demo)
-* [Installation](#installation)
-* [Configuration](#configuration)
-  * [Preferences file](#preferences-file)
-  * [Environment variables](#environment-variables)
-  * [Command-line Arguments](#command-line-arguments)
-* [Debugging](#debugging)
-* [Usage](#usage)
-* [Build Status](#build-status)
-* [Contributing](#contributing)
-* [License](#license)
+`terrafarm` is utility for working with [Terraform](https://www.terraform.io)-based [rpmbuilder](https://github.com/essentialkaos/rpmbuilder) farm on [DigitalOcean](https://www.digitalocean.com).
 
 ## Usage demo
 
-[![asciicast](https://essentialkaos.com/github/terrafarm-080-1.gif)](https://asciinema.org/a/47774)
+[![asciicast](https://essentialkaos.com/github/terrafarm-090.gif)](https://asciinema.org/a/80933)
 
 ## Installation
 

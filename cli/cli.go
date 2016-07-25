@@ -18,19 +18,21 @@ import (
 	"strings"
 	"time"
 
-	"pkg.re/essentialkaos/ek.v1/arg"
-	"pkg.re/essentialkaos/ek.v1/env"
-	"pkg.re/essentialkaos/ek.v1/fmtc"
-	"pkg.re/essentialkaos/ek.v1/fmtutil"
-	"pkg.re/essentialkaos/ek.v1/fsutil"
-	"pkg.re/essentialkaos/ek.v1/jsonutil"
-	"pkg.re/essentialkaos/ek.v1/log"
-	"pkg.re/essentialkaos/ek.v1/path"
-	"pkg.re/essentialkaos/ek.v1/signal"
-	"pkg.re/essentialkaos/ek.v1/spellcheck"
-	"pkg.re/essentialkaos/ek.v1/terminal"
-	"pkg.re/essentialkaos/ek.v1/timeutil"
-	"pkg.re/essentialkaos/ek.v1/usage"
+	"pkg.re/essentialkaos/ek.v3/arg"
+	"pkg.re/essentialkaos/ek.v3/env"
+	"pkg.re/essentialkaos/ek.v3/fmtc"
+	"pkg.re/essentialkaos/ek.v3/fmtutil"
+	"pkg.re/essentialkaos/ek.v3/fsutil"
+	"pkg.re/essentialkaos/ek.v3/jsonutil"
+	"pkg.re/essentialkaos/ek.v3/log"
+	"pkg.re/essentialkaos/ek.v3/path"
+	"pkg.re/essentialkaos/ek.v3/pluralize"
+	"pkg.re/essentialkaos/ek.v3/req"
+	"pkg.re/essentialkaos/ek.v3/signal"
+	"pkg.re/essentialkaos/ek.v3/spellcheck"
+	"pkg.re/essentialkaos/ek.v3/terminal"
+	"pkg.re/essentialkaos/ek.v3/timeutil"
+	"pkg.re/essentialkaos/ek.v3/usage"
 
 	"gopkg.in/hlandau/passlib.v1/hash/sha2crypt"
 
@@ -44,7 +46,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.8.0"
+	VER  = "0.9.0"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -63,6 +65,7 @@ const (
 	ARG_MAX_WAIT    = "w:max-wait"
 	ARG_FORCE       = "f:force"
 	ARG_NO_VALIDATE = "nv:no-validate"
+	ARG_NOTIFY      = "n:notify"
 	ARG_NO_COLOR    = "nc:no-color"
 	ARG_HELP        = "h:help"
 	ARG_VER         = "v:version"
@@ -81,6 +84,13 @@ const (
 	CMD_STATE     = "state"
 	CMD_TEMPLATES = "templates"
 	CMD_PROLONG   = "prolong"
+	CMD_DOCTOR    = "doctor"
+
+	CMD_CREATE_SHORTCUT    = "c"
+	CMD_DESTROY_SHORTCUT   = "d"
+	CMD_STATUS_SHORTCUT    = "s"
+	CMD_TEMPLATES_SHORTCUT = "t"
+	CMD_PROLONG_SHORTCUT   = "p"
 )
 
 // List of supported environment variables
@@ -184,6 +194,7 @@ var argMap = arg.Map{
 	ARG_MONITOR:     &arg.V{},
 	ARG_FORCE:       &arg.V{Type: arg.BOOL},
 	ARG_NO_VALIDATE: &arg.V{Type: arg.BOOL},
+	ARG_NOTIFY:      &arg.V{Type: arg.BOOL},
 	ARG_NO_COLOR:    &arg.V{Type: arg.BOOL},
 	ARG_HELP:        &arg.V{Type: arg.BOOL, Alias: "u:usage"},
 	ARG_VER:         &arg.V{Type: arg.BOOL, Alias: "ver"},
@@ -224,10 +235,8 @@ func Init() {
 	args, errs := arg.Parse(argMap)
 
 	if len(errs) != 0 {
-		fmtc.NewLine()
-
 		for _, err := range errs {
-			printError(err.Error())
+			terminal.PrintErrorMessage(err.Error())
 		}
 
 		exit(1)
@@ -252,6 +261,8 @@ func Init() {
 		return
 	}
 
+	req.RequestTimeout = 2.0
+
 	checkEnv()
 	checkDeps()
 
@@ -265,21 +276,21 @@ func Init() {
 // checkEnv check system environment
 func checkEnv() {
 	if envMap["GOPATH"] == "" {
-		printError("GOPATH must be set to valid path")
+		terminal.PrintErrorMessage("GOPATH must be set to valid path")
 		exit(1)
 	}
 
 	srcDir := getSrcDir()
 
 	if !fsutil.CheckPerms("DRW", srcDir) {
-		printError("Source directory %s is not accessible", srcDir)
+		terminal.PrintErrorMessage("Source directory %s is not accessible", srcDir)
 		exit(1)
 	}
 
 	dataDir := getDataDir()
 
 	if !fsutil.CheckPerms("DRW", dataDir) {
-		printError("Data directory %s is not accessible", dataDir)
+		terminal.PrintErrorMessage("Data directory %s is not accessible", dataDir)
 		exit(1)
 	}
 }
@@ -290,7 +301,7 @@ func checkDeps() {
 
 	for _, dep := range depList {
 		if env.Which(dep) == "" {
-			printError("Can't find %s. Please install it first.", dep)
+			terminal.PrintErrorMessage("Can't find %s. Please install it first.", dep)
 			hasErrors = true
 		}
 	}
@@ -306,18 +317,20 @@ func processCommand(cmd string, args []string) {
 	cmd = scm.Correct(cmd)
 
 	switch cmd {
-	case CMD_CREATE, CMD_APPLY, CMD_START:
+	case CMD_CREATE, CMD_APPLY, CMD_START, CMD_CREATE_SHORTCUT:
 		createCommand(findAndReadPreferences(), args)
-	case CMD_DESTROY, CMD_DELETE, CMD_STOP:
+	case CMD_DESTROY, CMD_DELETE, CMD_STOP, CMD_DESTROY_SHORTCUT:
 		destroyCommand(findAndReadPreferences())
-	case CMD_STATUS, CMD_INFO, CMD_STATE:
+	case CMD_STATUS, CMD_INFO, CMD_STATE, CMD_STATUS_SHORTCUT:
 		statusCommand(findAndReadPreferences())
-	case CMD_TEMPLATES:
+	case CMD_TEMPLATES, CMD_TEMPLATES_SHORTCUT:
 		templatesCommand()
-	case CMD_PROLONG:
+	case CMD_PROLONG, CMD_PROLONG_SHORTCUT:
 		prolongCommand(args)
+	case CMD_DOCTOR:
+		doctorCommand(findAndReadPreferences())
 	default:
-		printError("Unknown command %s", cmd)
+		terminal.PrintErrorMessage("Unknown command %s", cmd)
 		exit(1)
 	}
 
@@ -327,7 +340,7 @@ func processCommand(cmd string, args []string) {
 // createCommand is create command handler
 func createCommand(prefs *Preferences, args []string) {
 	if isTerrafarmActive() {
-		printWarn("Terrafarm already works")
+		terminal.PrintWarnMessage("Terrafarm already works")
 		exit(1)
 	}
 
@@ -339,7 +352,9 @@ func createCommand(prefs *Preferences, args []string) {
 	statusCommand(prefs)
 
 	if !arg.GetB(ARG_FORCE) {
-		if !terminal.ReadAnswer("Create farm with this preferences? (y/N)", "n") {
+		yes, err := terminal.ReadAnswer("Create farm with this preferences?", "n")
+
+		if !yes || err != nil {
 			fmtc.NewLine()
 			return
 		}
@@ -350,7 +365,7 @@ func createCommand(prefs *Preferences, args []string) {
 	vars, err := prefsToArgs(prefs)
 
 	if err != nil {
-		printError("Can't parse preferences: %v", err)
+		terminal.PrintErrorMessage("Can't parse preferences: %v", err)
 		exit(1)
 	}
 
@@ -365,7 +380,7 @@ func createCommand(prefs *Preferences, args []string) {
 	err = execTerraform(false, "apply", vars)
 
 	if err != nil {
-		printError("Error while executing terraform: %v", err)
+		terminal.PrintErrorMessage("\nError while executing terraform: %v", err)
 		exit(1)
 	}
 
@@ -379,7 +394,7 @@ func createCommand(prefs *Preferences, args []string) {
 		err = exportNodeList(prefs)
 
 		if err != nil {
-			printError("Error while exporting info: %v", err)
+			terminal.PrintErrorMessage("Error while exporting info: %v", err)
 		} else {
 			fmtc.Printf("{g}Info about build nodes saved as %s{!}\n", prefs.Output)
 		}
@@ -400,7 +415,7 @@ func createCommand(prefs *Preferences, args []string) {
 
 		if err != nil {
 			fmtc.NewLine()
-			printError("Error while starting monitoring process: %v", err)
+			terminal.PrintErrorMessage("Error while starting monitoring process: %v", err)
 			exit(1)
 		}
 
@@ -410,15 +425,19 @@ func createCommand(prefs *Preferences, args []string) {
 	}
 
 	saveState(prefs)
+
+	if arg.GetB(ARG_NOTIFY) {
+		fmtc.Bell()
+	}
 }
 
 // statusCommand is status command handler
 func statusCommand(prefs *Preferences) {
 	var (
-		tokenValid       bool
-		fingerprintValid bool
-		regionValid      bool
-		sizeValid        bool
+		tokenValid       do.StatusCode
+		fingerprintValid do.StatusCode
+		regionValid      do.StatusCode
+		sizeValid        do.StatusCode
 
 		ttlHours           float64
 		ttlRemain          int64
@@ -489,7 +508,7 @@ func statusCommand(prefs *Preferences) {
 
 	fmtc.Printf(
 		"  {*}%-16s{!} %s {s}(%s){!}\n", "Template:", prefs.Template,
-		fmtutil.Pluralize(buildersTotal, "build node", "build nodes"),
+		pluralize.Pluralize(buildersTotal, "build node", "build nodes"),
 	)
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
@@ -515,7 +534,7 @@ func statusCommand(prefs *Preferences) {
 	}
 
 	if prefs.MaxWait > 0 {
-		fmtc.Printf("{s} + %s wait{!}", fmtutil.Pluralize(int(prefs.MaxWait), "minute", "minutes"))
+		fmtc.Printf("{s} + %s wait{!}", pluralize.Pluralize(int(prefs.MaxWait), "minute", "minutes"))
 	}
 
 	if prefs.TTL <= 0 || totalUsagePriceMin <= 0 {
@@ -583,7 +602,7 @@ func statusCommand(prefs *Preferences) {
 // destroyCommand is destroy command handler
 func destroyCommand(prefs *Preferences) {
 	if !isTerrafarmActive() {
-		printWarn("Terrafarm does not works, nothing to destroy")
+		terminal.PrintWarnMessage("Terrafarm does not works, nothing to destroy")
 		exit(1)
 	}
 
@@ -593,19 +612,21 @@ func destroyCommand(prefs *Preferences) {
 		fmtc.NewLine()
 
 		if activeBuildNodesCount != 0 {
-			yes := terminal.ReadAnswer(
+			yes, err := terminal.ReadAnswer(
 				fmtc.Sprintf(
-					"Currently farm have %s. Do you REALLY want destroy farm? (y/N)",
-					fmtutil.Pluralize(activeBuildNodesCount, "active build process", "active build processes"),
-				), "N",
+					"Currently farm have %s. Do you REALLY want destroy farm?",
+					pluralize.Pluralize(activeBuildNodesCount, "active build process", "active build processes"),
+				), "n",
 			)
 
-			if !yes {
+			if !yes || err != nil {
 				fmtc.NewLine()
 				return
 			}
 		} else {
-			if !terminal.ReadAnswer("Destroy farm? (y/N)", "n") {
+			yes, err := terminal.ReadAnswer("Destroy farm?", "n")
+
+			if !yes || err != nil {
 				fmtc.NewLine()
 				return
 			}
@@ -614,10 +635,12 @@ func destroyCommand(prefs *Preferences) {
 
 	fmtutil.Separator(false)
 
+	priceMessage, priceMessageComment := getUsagePriceMessage()
+
 	vars, err := prefsToArgs(prefs, "-force")
 
 	if err != nil {
-		printError("Can't parse prefs: %v", err)
+		terminal.PrintErrorMessage("Can't parse prefs: %v", err)
 		exit(1)
 	}
 
@@ -632,7 +655,7 @@ func destroyCommand(prefs *Preferences) {
 	err = execTerraform(false, "destroy", vars)
 
 	if err != nil {
-		printError("Error while executing terraform: %v", err)
+		terminal.PrintErrorMessage("\nError while executing terraform: %v", err)
 		exit(1)
 	}
 
@@ -640,7 +663,15 @@ func destroyCommand(prefs *Preferences) {
 
 	fmtutil.Separator(false)
 
+	if priceMessage != "" {
+		fmtc.Printf("  {*}Usage price:{!} %s {s}(%s){!}\n\n", priceMessage, priceMessageComment)
+	}
+
 	deleteFarmStateFile()
+
+	if arg.GetB(ARG_NOTIFY) {
+		fmtc.Bell()
+	}
 }
 
 // templatesCommand is templates command handler
@@ -651,7 +682,7 @@ func templatesCommand() {
 	)
 
 	if len(templates) == 0 {
-		printWarn("No templates found")
+		terminal.PrintWarnMessage("No templates found")
 		return
 	}
 
@@ -664,7 +695,7 @@ func templatesCommand() {
 
 		fmtc.Printf(
 			"  %s {s}(%s){!}\n", template,
-			fmtutil.Pluralize(buildersCount, "build node", "build nodes"),
+			pluralize.Pluralize(buildersCount, "build node", "build nodes"),
 		)
 	}
 
@@ -674,17 +705,17 @@ func templatesCommand() {
 // prolongCommand prolong farm TTL
 func prolongCommand(args []string) {
 	if !isTerrafarmActive() {
-		printWarn("Farm does not works")
+		terminal.PrintWarnMessage("Farm does not works")
 		exit(1)
 	}
 
 	if !isMonitorActive() {
-		printWarn("Monitor does not works")
+		terminal.PrintWarnMessage("Monitor does not works")
 		exit(1)
 	}
 
 	if len(args) == 0 {
-		printError("You must provide prolongation time")
+		terminal.PrintErrorMessage("You must provide prolongation time")
 		exit(1)
 	}
 
@@ -697,7 +728,7 @@ func prolongCommand(args []string) {
 		ttl = timeutil.ParseDuration(args[0]) / 60
 
 		if ttl == 0 {
-			printError("Incorrect ttl property")
+			terminal.PrintErrorMessage("Incorrect ttl property")
 		}
 	}
 
@@ -705,7 +736,7 @@ func prolongCommand(args []string) {
 		maxWait = timeutil.ParseDuration(args[1]) / 60
 
 		if maxWait == 0 {
-			printError("Incorrect max-wait property")
+			terminal.PrintErrorMessage("Incorrect max-wait property")
 		}
 	}
 
@@ -716,19 +747,21 @@ func prolongCommand(args []string) {
 	switch maxWait {
 	case 0:
 		answer = fmtc.Sprintf(
-			"Do you want to increase TTL on %s? (Y/n)",
+			"Do you want to increase TTL on %s?",
 			timeutil.PrettyDuration(time.Duration(ttl)*time.Minute),
 		)
 
 	default:
 		answer = fmtc.Sprintf(
-			"Do you want to increase TTL on %s and set max wait to %s? (Y/n)",
+			"Do you want to increase TTL on %s and set max wait to %s?",
 			timeutil.PrettyDuration(time.Duration(ttl)*time.Minute),
 			timeutil.PrettyDuration(time.Duration(maxWait)*time.Minute),
 		)
 	}
 
-	if !terminal.ReadAnswer(answer, "Y") {
+	yes, err := terminal.ReadAnswer(answer, "y")
+
+	if !yes || err != nil {
 		fmtc.NewLine()
 		return
 	}
@@ -738,16 +771,16 @@ func prolongCommand(args []string) {
 	farmState, err := readFarmState()
 
 	if err != nil {
-		printError("ERROR\n")
-		printError("Can't read farm state file: %v\n", err)
+		terminal.PrintErrorMessage("ERROR\n")
+		terminal.PrintErrorMessage("Can't read farm state file: %v\n", err)
 		exit(1)
 	}
 
 	monitorState, err := readMonitorState()
 
 	if err != nil {
-		printError("ERROR\n")
-		printError("Can't read monitor state file: %v\n", err)
+		terminal.PrintErrorMessage("ERROR\n")
+		terminal.PrintErrorMessage("Can't read monitor state file: %v\n", err)
 		exit(1)
 	}
 
@@ -756,8 +789,8 @@ func prolongCommand(args []string) {
 	err = killMonitorProcess()
 
 	if err != nil {
-		printError("ERROR\n")
-		printError("Can't stop monitor process: %v\n", err)
+		terminal.PrintErrorMessage("ERROR\n")
+		terminal.PrintErrorMessage("Can't stop monitor process: %v\n", err)
 		exit(1)
 	} else {
 		fmtc.Println("{g}DONE{!}")
@@ -774,8 +807,8 @@ func prolongCommand(args []string) {
 	err = updateFarmState(farmState)
 
 	if err != nil {
-		printError("ERROR\n")
-		printError("Can't save farm state: %v\n", err)
+		terminal.PrintErrorMessage("ERROR\n")
+		terminal.PrintErrorMessage("Can't save farm state: %v\n", err)
 		exit(1)
 	} else {
 		fmtc.Println("{g}DONE{!}")
@@ -792,8 +825,8 @@ func prolongCommand(args []string) {
 	err = saveMonitorState(monitorState)
 
 	if err != nil {
-		printError("ERROR\n")
-		printError("Can't save monitoring state: %v\n", err)
+		terminal.PrintErrorMessage("ERROR\n")
+		terminal.PrintErrorMessage("Can't save monitoring state: %v\n", err)
 		exit(1)
 	} else {
 		fmtc.Println("{g}DONE{!}")
@@ -804,12 +837,78 @@ func prolongCommand(args []string) {
 	err = startMonitorProcess(farmState.Preferences, true)
 
 	if err != nil {
-		printError("ERROR\n")
-		printError("Can't start monitoring process: %v\n", err)
+		terminal.PrintErrorMessage("ERROR\n")
+		terminal.PrintErrorMessage("Can't start monitoring process: %v\n", err)
 		exit(1)
 	} else {
 		fmtc.Println("{g}DONE{!}")
 	}
+
+	fmtc.NewLine()
+}
+
+// doctorCommand fix problems with farm
+func doctorCommand(prefs *Preferences) {
+	fmtc.Println("\nThis command can solve almost all problems that can occur with farm.")
+	fmtc.Println("This is list of actions which will be performed:\n")
+
+	fmtc.Println(" - Terrafarm monitor will be stopped")
+	fmtc.Println(" - Terraform state file will be removed")
+	fmtc.Println(" - Terrafarm state file will be removed")
+	fmtc.Println(" - All droplets with prefix \"terrafarm\" will be destroyed\n")
+
+	yes, err := terminal.ReadAnswer("Perform dry run of this actions?", "n")
+
+	if !yes || err != nil {
+		fmtc.NewLine()
+		return
+	}
+
+	fmtc.NewLine()
+
+	terraformStateFile := getTerraformStateFilePath()
+	terrafarmStateFile := getFarmStateFilePath()
+
+	terrafarmDroplets, err := do.GetTerrafarmDropletsList(prefs.Token)
+
+	if err != nil {
+		terminal.PrintErrorMessage(err.Error())
+		exit(1)
+	}
+
+	fmtc.Printf("  File %s removed\n", terraformStateFile)
+	fmtc.Printf("  File %s removed\n", terrafarmStateFile)
+
+	for dropletName, dropletID := range terrafarmDroplets {
+		fmtc.Printf("  Droplet %s {s}(ID: %d){!} destroyed\n", dropletName, dropletID)
+	}
+
+	fmtc.NewLine()
+
+	yes, err = terminal.ReadAnswer("Perform this actions?", "n")
+
+	if !yes || err != nil {
+		fmtc.NewLine()
+		return
+	}
+
+	fmtc.NewLine()
+
+	printErrorStatusMarker(killMonitorProcess())
+
+	fmtc.Println("Terrafarm monitor stoppped")
+
+	printErrorStatusMarker(os.Remove(terraformStateFile))
+
+	fmtc.Printf("File %s removed\n", terraformStateFile)
+
+	printErrorStatusMarker(os.Remove(terrafarmStateFile))
+
+	fmtc.Printf("File %s removed\n", terrafarmStateFile)
+
+	printErrorStatusMarker(do.DestroyTerrafarmDroplets(prefs.Token))
+
+	fmtc.Println("Terrafarm droplets destroyed")
 
 	fmtc.NewLine()
 }
@@ -834,14 +933,26 @@ func saveState(prefs *Preferences) {
 }
 
 // printValidationMarker print validation mark
-func printValidationMarker(value, disableValidate bool) {
+func printValidationMarker(value do.StatusCode, disableValidate bool) {
 	switch {
 	case disableValidate == true:
 		fmtc.Printf("\n")
-	case value == true:
+	case value == do.STATUS_OK:
 		fmtc.Printf(" {g}✔{!}\n")
-	case value == false:
+	case value == do.STATUS_NOT_OK:
 		fmtc.Printf(" {r}✘{!}\n")
+	case value == do.STATUS_ERROR:
+		fmtc.Printf(" {y*}?{!}\n")
+	}
+}
+
+// printErrorStatusMarker print green check symbol if err is null
+// or red cross otherwise
+func printErrorStatusMarker(err error) {
+	if err == nil {
+		fmtc.Printf("{g}✔{!} ")
+	} else {
+		fmtc.Printf("{r}✘{!} ")
 	}
 }
 
@@ -1034,6 +1145,39 @@ func getColoredCommandOutput(line string) string {
 	}
 }
 
+// getUsagePriceMessage return message with usage price
+func getUsagePriceMessage() (string, string) {
+	if !isMonitorActive() {
+		return "", ""
+	}
+
+	state, err := readMonitorState()
+
+	if err != nil {
+		return "", ""
+	}
+
+	farmState, err := readFarmState()
+
+	if err != nil {
+		return "", ""
+	}
+
+	buildersTotal := getBuildNodesCount(farmState.Preferences.Template)
+	usageHours := time.Since(time.Unix(state.Started, 0)).Hours()
+	usageMinutes := int(time.Since(time.Unix(state.Started, 0)).Minutes())
+	currentUsagePrice := (usageHours * dropletPrices[farmState.Preferences.NodeSize]) * float64(buildersTotal)
+
+	switch buildersTotal {
+	case 1:
+		return fmtc.Sprintf("$%.2f", currentUsagePrice),
+			fmtc.Sprintf("%s × %d min", farmState.Preferences.NodeSize, usageMinutes)
+	default:
+		return fmtc.Sprintf("$%.2f", currentUsagePrice),
+			fmtc.Sprintf("%d × %s × %d min", buildersTotal, farmState.Preferences.NodeSize, usageMinutes)
+	}
+}
+
 // addSignalInterception add interceptors for INT и TERM signals
 func addSignalInterception() {
 	signal.Handlers{
@@ -1190,7 +1334,7 @@ func printNodesInfo(prefs *Preferences) {
 	nodesInfo, err := collectNodesInfo(prefs)
 
 	if err != nil {
-		printError("Can't collect nodes info: %v", err)
+		terminal.PrintErrorMessage("Can't collect nodes info: %v", err)
 		return
 	}
 
@@ -1243,7 +1387,7 @@ func exportNodeList(prefs *Preferences) error {
 
 // signalInterceptor is TERM and INT signal handler
 func signalInterceptor() {
-	printWarn("\nYou can't cancel command execution in this time")
+	terminal.PrintWarnMessage("\nYou can't cancel command execution in this time")
 }
 
 // getSpellcheckModel return spellcheck model for correcting
@@ -1254,16 +1398,6 @@ func getSpellcheckModel() *spellcheck.Model {
 		CMD_DESTROY, CMD_DELETE, CMD_STOP,
 		CMD_STATUS, CMD_INFO, CMD_STATE,
 	})
-}
-
-// printError prints error message to console
-func printError(f string, a ...interface{}) {
-	fmtc.Printf("{r}"+f+"{!}\n", a...)
-}
-
-// printError prints warning message to console
-func printWarn(f string, a ...interface{}) {
-	fmtc.Printf("{y}"+f+"{!}\n", a...)
 }
 
 // cleanTerraformGarbage remove tf-plugin* files from
@@ -1305,8 +1439,9 @@ func showUsage() {
 	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferences and status")
 	info.AddCommand(CMD_TEMPLATES, "List all available farm templates")
 	info.AddCommand(CMD_PROLONG, "Increase TTL or set max wait time", "ttl max-wait")
+	info.AddCommand(CMD_DOCTOR, "Fix problems with farm")
 
-	info.AddOption(ARG_TTL, "Max farm TTL (Time To Live)", "time")
+	info.AddOption(ARG_TTL, "Max farm TTL {s}(Time To Live){!}", "time")
 	info.AddOption(ARG_MAX_WAIT, "Max time which monitor will wait if farm have active build", "time")
 	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
 	info.AddOption(ARG_TOKEN, "DigitalOcean token", "token")
@@ -1317,6 +1452,7 @@ func showUsage() {
 	info.AddOption(ARG_PASSWORD, "Build node user password", "password")
 	info.AddOption(ARG_FORCE, "Force command execution")
 	info.AddOption(ARG_NO_VALIDATE, "Don't validate preferences")
+	info.AddOption(ARG_NOTIFY, "Ring the system bell after finishing command execution")
 	info.AddOption(ARG_NO_COLOR, "Disable colors in output")
 	info.AddOption(ARG_HELP, "Show this help message")
 	info.AddOption(ARG_VER, "Show version")
