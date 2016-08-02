@@ -46,7 +46,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.9.0"
+	VER  = "0.9.1"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -938,11 +938,11 @@ func printValidationMarker(value do.StatusCode, disableValidate bool) {
 	case disableValidate == true:
 		fmtc.Printf("\n")
 	case value == do.STATUS_OK:
-		fmtc.Printf(" {g}✔{!}\n")
+		fmtc.Printf(" {g}✔ {!}\n")
 	case value == do.STATUS_NOT_OK:
-		fmtc.Printf(" {r}✘{!}\n")
+		fmtc.Printf(" {r}✘ {!}\n")
 	case value == do.STATUS_ERROR:
-		fmtc.Printf(" {y*}?{!}\n")
+		fmtc.Printf(" {y*}? {!}\n")
 	}
 }
 
