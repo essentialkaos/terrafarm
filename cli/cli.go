@@ -46,7 +46,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.9.1"
+	VER  = "0.9.2"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -203,9 +203,6 @@ var argMap = arg.Map{
 // depList is slice with dependencies required by terrafarm
 var depList = []string{
 	"terraform",
-	"terraform-provider-digitalocean",
-	"terraform-provisioner-file",
-	"terraform-provisioner-remote-exec",
 }
 
 // envMap is map with environment variables
