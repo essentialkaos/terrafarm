@@ -1423,8 +1423,11 @@ func cleanTerraformGarbage() {
 
 // exit exit from app with given code
 func exit(code int) {
+	if !arg.GetB(ARG_DEBUG) {
+		temp.Clean()
+	}
+
 	cleanTerraformGarbage()
-	temp.Clean()
 	os.Exit(code)
 }
 
