@@ -32,9 +32,8 @@ import (
 	"pkg.re/essentialkaos/ek.v3/spellcheck"
 	"pkg.re/essentialkaos/ek.v3/terminal"
 	"pkg.re/essentialkaos/ek.v3/timeutil"
+	"pkg.re/essentialkaos/ek.v3/tmp"
 	"pkg.re/essentialkaos/ek.v3/usage"
-
-	"gopkg.in/hlandau/passlib.v1/hash/sha2crypt"
 
 	sshkey "github.com/yosida95/golang-sshkey"
 
@@ -46,7 +45,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.9.2"
+	VER  = "0.10.0"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -224,6 +223,9 @@ var dropletPrices = map[string]float64{
 	"64gb":  0.952,
 }
 
+// temp is temp struct
+var temp *tmp.Temp
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 func Init() {
@@ -258,8 +260,7 @@ func Init() {
 		return
 	}
 
-	req.RequestTimeout = 2.0
-
+	prepare()
 	checkEnv()
 	checkDeps()
 
@@ -267,6 +268,20 @@ func Init() {
 		startFarmMonitor()
 	} else {
 		processCommand(args[0], args[1:])
+	}
+}
+
+// prepare configure resources
+func prepare() {
+	var err error
+
+	req.RequestTimeout = 2.0
+
+	temp, err = tmp.NewTemp()
+
+	if err != nil {
+		terminal.PrintErrorMessage(err.Error())
+		exit(1)
 	}
 }
 
@@ -970,11 +985,6 @@ func getFingerprint(key string) (string, error) {
 	return sshkey.PrettyFingerprint(pubkey, crypto.MD5)
 }
 
-// getPasswordHash return shadow file compatible hash
-func getPasswordHash(password string) (string, error) {
-	return sha2crypt.NewCrypter512(5000).Hash(password)
-}
-
 // getMaskedToken return first and last 8 symbols of token
 func getMaskedToken(token string) string {
 	if len(token) != 64 {
@@ -1021,42 +1031,34 @@ func getBuildBullets(prefs *Preferences) string {
 
 // prefsToArgs return preferences as command line arguments for terraform
 func prefsToArgs(prefs *Preferences, args ...string) ([]string, error) {
-	auth, err := getPasswordHash(prefs.Password)
+	varsData, err := prefs.GetVariablesData()
 
 	if err != nil {
 		return nil, err
 	}
 
-	fingerpint, err := getFingerprint(prefs.Key + ".pub")
+	varsFd, varsFile, err := temp.MkFile()
 
 	if err != nil {
 		return nil, err
 	}
 
-	var vars []string
+	_, err = fmtc.Fprintln(varsFd, varsData)
 
-	vars = append(vars, fmtc.Sprintf("-var token=%s", prefs.Token))
-	vars = append(vars, fmtc.Sprintf("-var auth=%s", auth))
-	vars = append(vars, fmtc.Sprintf("-var fingerprint=%s", fingerpint))
-	vars = append(vars, fmtc.Sprintf("-var key=%s", prefs.Key))
-	vars = append(vars, fmtc.Sprintf("-var user=%s", prefs.User))
-	vars = append(vars, fmtc.Sprintf("-var password=%s", prefs.Password))
-
-	if prefs.Region != "" {
-		vars = append(vars, fmtc.Sprintf("-var region=%s", prefs.Region))
+	if err != nil {
+		return nil, err
 	}
 
-	if prefs.NodeSize != "" {
-		vars = append(vars, fmtc.Sprintf("-var node_size=%s", prefs.NodeSize))
+	varsSlice := []string{
+		fmtc.Sprintf("-var-file=%s", varsFile),
+		fmtc.Sprintf("-state=%s", getTerraformStateFilePath()),
 	}
-
-	vars = append(vars, fmtc.Sprintf("-state=%s", getTerraformStateFilePath()))
 
 	if len(args) != 0 {
-		vars = append(vars, args...)
+		varsSlice = append(varsSlice, args...)
 	}
 
-	return vars, nil
+	return varsSlice, nil
 }
 
 // execTerraform execute terraform command
@@ -1422,6 +1424,7 @@ func cleanTerraformGarbage() {
 // exit exit from app with given code
 func exit(code int) {
 	cleanTerraformGarbage()
+	temp.Clean()
 	os.Exit(code)
 }
 
