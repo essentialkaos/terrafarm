@@ -8,6 +8,7 @@ package cli
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -17,6 +18,8 @@ import (
 	"pkg.re/essentialkaos/ek.v3/fsutil"
 	"pkg.re/essentialkaos/ek.v3/terminal"
 	"pkg.re/essentialkaos/ek.v3/timeutil"
+
+	"gopkg.in/hlandau/passlib.v1/hash/sha2crypt"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -311,6 +314,41 @@ func validatePreferences(prefs *Preferences) {
 	if hasErrors {
 		os.Exit(1)
 	}
+}
+
+// ////////////////////////////////////////////////////////////////////////////////// //
+
+func (p *Preferences) GetVariablesData() (string, error) {
+	var result string
+
+	auth, err := sha2crypt.NewCrypter512(5000).Hash(p.Password)
+
+	if err != nil {
+		return "", err
+	}
+
+	fingerpint, err := getFingerprint(p.Key + ".pub")
+
+	if err != nil {
+		return "", err
+	}
+
+	result += fmt.Sprintf("%s = \"%s\"\n", "token", p.Token)
+	result += fmt.Sprintf("%s = \"%s\"\n", "auth", auth)
+	result += fmt.Sprintf("%s = \"%s\"\n", "fingerprint", fingerpint)
+	result += fmt.Sprintf("%s = \"%s\"\n", "key", p.Key)
+	result += fmt.Sprintf("%s = \"%s\"\n", "user", p.User)
+	result += fmt.Sprintf("%s = \"%s\"\n", "password", p.Password)
+
+	if p.Region != "" {
+		result += fmt.Sprintf("%s = \"%s\"\n", "region", p.Region)
+	}
+
+	if p.NodeSize != "" {
+		result += fmt.Sprintf("%s = \"%s\"\n", "node_size", p.NodeSize)
+	}
+
+	return result, nil
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
