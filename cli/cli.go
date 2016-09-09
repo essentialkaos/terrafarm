@@ -384,7 +384,7 @@ func createCommand(prefs *Preferences, args []string) {
 	addSignalInterception()
 
 	if arg.GetB(ARG_DEBUG) {
-		fmtc.Printf("{s}EXEC → terraform apply %s{!}\n\n", strings.Join(vars, " "))
+		fmtc.Printf("{s-}EXEC → terraform apply %s{!}\n\n", strings.Join(vars, " "))
 	}
 
 	fsutil.Push(path.Join(getDataDir(), prefs.Template))
@@ -519,7 +519,7 @@ func statusCommand(prefs *Preferences) {
 	fmtutil.Separator(false, "TERRAFARM")
 
 	fmtc.Printf(
-		"  {*}%-16s{!} %s {s}(%s){!}\n", "Template:", prefs.Template,
+		"  {*}%-16s{!} %s {s-}(%s){!}\n", "Template:", prefs.Template,
 		pluralize.Pluralize(buildersTotal, "build node", "build nodes"),
 	)
 
@@ -546,15 +546,15 @@ func statusCommand(prefs *Preferences) {
 	}
 
 	if prefs.MaxWait > 0 {
-		fmtc.Printf("{s} + %s wait{!}", pluralize.Pluralize(int(prefs.MaxWait), "minute", "minutes"))
+		fmtc.Printf("{s-} + %s wait{!}", pluralize.Pluralize(int(prefs.MaxWait), "minute", "minutes"))
 	}
 
 	if prefs.TTL <= 0 || totalUsagePriceMin <= 0 {
 		fmtc.NewLine()
 	} else if totalUsagePriceMin > 0 && totalUsagePriceMax > 0 {
-		fmtc.Printf(" {s}(~ $%.2f - $%.2f){!}\n", totalUsagePriceMin, totalUsagePriceMax)
+		fmtc.Printf(" {s-}(~ $%.2f - $%.2f){!}\n", totalUsagePriceMin, totalUsagePriceMax)
 	} else {
-		fmtc.Printf(" {s}(~ $%.2f){!}\n", totalUsagePriceMin)
+		fmtc.Printf(" {s-}(~ $%.2f){!}\n", totalUsagePriceMin)
 	}
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Region:", prefs.Region)
@@ -574,14 +574,14 @@ func statusCommand(prefs *Preferences) {
 	fmtc.NewLine()
 
 	if !isTerrafarmActive() {
-		fmtc.Printf("  {*}%-16s{!} {s}stopped{!}\n", "State:")
+		fmtc.Printf("  {*}%-16s{!} {s-}stopped{!}\n", "State:")
 	} else {
 		fmtc.Printf("  {*}%-16s{!} {g}works{!}", "State:")
 
 		if currentUsagePrice == 0 {
 			fmtc.NewLine()
 		} else {
-			fmtc.Printf(" {s}($%.2f){!}\n", currentUsagePrice)
+			fmtc.Printf(" {s-}($%.2f){!}\n", currentUsagePrice)
 		}
 
 		fmtc.Printf("  {*}%-16s{!} "+buildersBullets+"\n", "Nodes Statuses:")
@@ -598,7 +598,7 @@ func statusCommand(prefs *Preferences) {
 					}
 				} else {
 					fmtc.Printf(
-						"  {*}%-16s{!} {g}works{!} {s}(%s to destroy){!}\n",
+						"  {*}%-16s{!} {g}works{!} {s-}(%s to destroy){!}\n",
 						"Monitor:", timeutil.PrettyDuration(ttlRemain),
 					)
 				}
@@ -659,7 +659,7 @@ func destroyCommand(prefs *Preferences) {
 	addSignalInterception()
 
 	if arg.GetB(ARG_DEBUG) {
-		fmtc.Printf("{s}EXEC → terraform destroy %s{!}\n\n", strings.Join(vars, " "))
+		fmtc.Printf("{s-}EXEC → terraform destroy %s{!}\n\n", strings.Join(vars, " "))
 	}
 
 	fsutil.Push(path.Join(getDataDir(), prefs.Template))
@@ -676,7 +676,7 @@ func destroyCommand(prefs *Preferences) {
 	fmtutil.Separator(false)
 
 	if priceMessage != "" {
-		fmtc.Printf("  {*}Usage price:{!} %s {s}(%s){!}\n\n", priceMessage, priceMessageComment)
+		fmtc.Printf("  {*}Usage price:{!} %s {s-}(%s){!}\n\n", priceMessage, priceMessageComment)
 	}
 
 	deleteFarmStateFile()
@@ -706,7 +706,7 @@ func templatesCommand() {
 		buildersCount := getBuildNodesCount(template)
 
 		fmtc.Printf(
-			"  %s {s}(%s){!}\n", template,
+			"  %s {s-}(%s){!}\n", template,
 			pluralize.Pluralize(buildersCount, "build node", "build nodes"),
 		)
 	}
@@ -892,7 +892,7 @@ func doctorCommand(prefs *Preferences) {
 	fmtc.Printf("  File %s removed\n", terrafarmStateFile)
 
 	for dropletName, dropletID := range terrafarmDroplets {
-		fmtc.Printf("  Droplet %s {s}(ID: %d){!} destroyed\n", dropletName, dropletID)
+		fmtc.Printf("  Droplet %s {s-}(ID: %d){!} destroyed\n", dropletName, dropletID)
 	}
 
 	fmtc.NewLine()
@@ -1016,10 +1016,10 @@ func getBuildBullets(prefs *Preferences) string {
 	for _, node := range nodes {
 		switch node.State {
 		case STATE_ACTIVE:
-			result += "{g}•{!}"
+			result += "{g~}•{!}"
 
 		case STATE_INACTIVE:
-			result += "{s}•{!}"
+			result += "{s-}•{!}"
 
 		default:
 			result += "{r}•{!}"
@@ -1339,7 +1339,7 @@ func printNodesInfo(prefs *Preferences) {
 
 	for _, node := range nodesInfo {
 		fmtc.Printf(
-			"  {*}%20s{!}: ssh %s@%s {s}(Password: %s){!}\n",
+			"  {*}%20s{!}: ssh %s@%s {s-}(Password: %s){!}\n",
 			node.Name, node.User, node.IP, node.Password,
 		)
 	}
@@ -1444,7 +1444,7 @@ func showUsage() {
 	info.AddCommand(CMD_PROLONG, "Increase TTL or set max wait time", "ttl max-wait")
 	info.AddCommand(CMD_DOCTOR, "Fix problems with farm")
 
-	info.AddOption(ARG_TTL, "Max farm TTL {s}(Time To Live){!}", "time")
+	info.AddOption(ARG_TTL, "Max farm TTL {s-}(Time To Live){!}", "time")
 	info.AddOption(ARG_MAX_WAIT, "Max time which monitor will wait if farm have active build", "time")
 	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
 	info.AddOption(ARG_TOKEN, "DigitalOcean token", "token")

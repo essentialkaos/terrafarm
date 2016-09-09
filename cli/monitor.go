@@ -299,7 +299,7 @@ func startMonitorProcess(prefs *Preferences, restart bool) error {
 	}
 
 	if arg.GetB(ARG_DEBUG) {
-		fmtc.Printf("\n{s}EXEC → terrafarm --monitor %s{!}\n\n", monitorPrefs)
+		fmtc.Printf("\n{s-}EXEC → terrafarm --monitor %s{!}\n\n", monitorPrefs)
 	}
 
 	cmd := exec.Command("terrafarm", "--monitor", monitorPrefs)
