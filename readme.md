@@ -8,7 +8,7 @@
 
 ## Usage demo
 
-[![asciicast](https://essentialkaos.com/github/terrafarm-090.gif)](https://asciinema.org/a/80933)
+[![asciicast](https://essentialkaos.com/github/terrafarm-0101.gif)](https://asciinema.org/a/85405)
 
 ## Installation
 
