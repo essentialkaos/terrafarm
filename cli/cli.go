@@ -45,7 +45,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.10.1"
+	VER  = "0.10.2"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -1405,7 +1405,7 @@ func cleanTerraformGarbage() {
 	garbage := fsutil.List(
 		"/tmp", false,
 		&fsutil.ListingFilter{
-			MatchPatterns: []string{"tf-plugin*"},
+			MatchPatterns: []string{"tf-plugin*", "plugin*"},
 			CTimeYounger:  startTime,
 		},
 	)
