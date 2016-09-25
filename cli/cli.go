@@ -45,7 +45,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.10.1"
+	VER  = "0.10.2"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -1016,7 +1016,7 @@ func getBuildBullets(prefs *Preferences) string {
 	for _, node := range nodes {
 		switch node.State {
 		case STATE_ACTIVE:
-			result += "{g~}•{!}"
+			result += "{g}•{!}"
 
 		case STATE_INACTIVE:
 			result += "{s-}•{!}"
