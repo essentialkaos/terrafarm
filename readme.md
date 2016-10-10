@@ -126,7 +126,7 @@ Options
   --help, -h                 Show this help message
   --version, -v              Show version
 
-Examples:
+Examples
 
   terrafarm create --node-size 8gb --ttl 3h
   Create farm with redefined node size and TTL
