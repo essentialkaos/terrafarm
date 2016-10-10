@@ -13,11 +13,11 @@ import (
 	"os"
 	"strings"
 
-	"pkg.re/essentialkaos/ek.v3/arg"
-	"pkg.re/essentialkaos/ek.v3/crypto"
-	"pkg.re/essentialkaos/ek.v3/fsutil"
-	"pkg.re/essentialkaos/ek.v3/terminal"
-	"pkg.re/essentialkaos/ek.v3/timeutil"
+	"pkg.re/essentialkaos/ek.v5/arg"
+	"pkg.re/essentialkaos/ek.v5/fsutil"
+	"pkg.re/essentialkaos/ek.v5/passwd"
+	"pkg.re/essentialkaos/ek.v5/terminal"
+	"pkg.re/essentialkaos/ek.v5/timeutil"
 
 	"gopkg.in/hlandau/passlib.v1/hash/sha2crypt"
 )
@@ -47,7 +47,7 @@ func findAndReadPreferences() *Preferences {
 		Region:   "fra1",
 		NodeSize: "16gb",
 		User:     "builder",
-		Password: crypto.GenPassword(18, crypto.STRENGTH_MEDIUM),
+		Password: passwd.GenPassword(18, passwd.STRENGTH_MEDIUM),
 		Template: "c6-multiarch",
 	}
 
