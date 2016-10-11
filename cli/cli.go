@@ -18,22 +18,22 @@ import (
 	"strings"
 	"time"
 
-	"pkg.re/essentialkaos/ek.v3/arg"
-	"pkg.re/essentialkaos/ek.v3/env"
-	"pkg.re/essentialkaos/ek.v3/fmtc"
-	"pkg.re/essentialkaos/ek.v3/fmtutil"
-	"pkg.re/essentialkaos/ek.v3/fsutil"
-	"pkg.re/essentialkaos/ek.v3/jsonutil"
-	"pkg.re/essentialkaos/ek.v3/log"
-	"pkg.re/essentialkaos/ek.v3/path"
-	"pkg.re/essentialkaos/ek.v3/pluralize"
-	"pkg.re/essentialkaos/ek.v3/req"
-	"pkg.re/essentialkaos/ek.v3/signal"
-	"pkg.re/essentialkaos/ek.v3/spellcheck"
-	"pkg.re/essentialkaos/ek.v3/terminal"
-	"pkg.re/essentialkaos/ek.v3/timeutil"
-	"pkg.re/essentialkaos/ek.v3/tmp"
-	"pkg.re/essentialkaos/ek.v3/usage"
+	"pkg.re/essentialkaos/ek.v5/arg"
+	"pkg.re/essentialkaos/ek.v5/env"
+	"pkg.re/essentialkaos/ek.v5/fmtc"
+	"pkg.re/essentialkaos/ek.v5/fmtutil"
+	"pkg.re/essentialkaos/ek.v5/fsutil"
+	"pkg.re/essentialkaos/ek.v5/jsonutil"
+	"pkg.re/essentialkaos/ek.v5/log"
+	"pkg.re/essentialkaos/ek.v5/path"
+	"pkg.re/essentialkaos/ek.v5/pluralize"
+	"pkg.re/essentialkaos/ek.v5/req"
+	"pkg.re/essentialkaos/ek.v5/signal"
+	"pkg.re/essentialkaos/ek.v5/spellcheck"
+	"pkg.re/essentialkaos/ek.v5/terminal"
+	"pkg.re/essentialkaos/ek.v5/timeutil"
+	"pkg.re/essentialkaos/ek.v5/tmp"
+	"pkg.re/essentialkaos/ek.v5/usage"
 
 	sshkey "github.com/yosida95/golang-sshkey"
 
@@ -45,7 +45,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.10.2"
+	VER  = "0.10.3"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -275,7 +275,8 @@ func Init() {
 func prepare() {
 	var err error
 
-	req.RequestTimeout = 2.0
+	req.SetUserAgent(APP, VER)
+	req.SetRequestTimeout(2.0)
 
 	temp, err = tmp.NewTemp()
 

@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"pkg.re/essentialkaos/ek.v3/req"
+	"pkg.re/essentialkaos/ek.v5/req"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -26,9 +26,6 @@ const (
 
 // DO_API is DO API url
 const DO_API = "https://api.digitalocean.com/v2"
-
-// USER_AGENT is user agent used for all requests
-const USER_AGENT = "terrafarm"
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
@@ -81,9 +78,8 @@ type Droplet struct {
 func IsValidToken(token string) StatusCode {
 	resp, err := req.Request{
 		URL:         DO_API + "/account",
-		UserAgent:   USER_AGENT,
-		ContentType: "application/json",
-		Headers:     req.Headers{"Authorization": "Bearer " + token},
+		ContentType: req.CONTENT_TYPE_JSON,
+		Headers:     getAuthHeaders(token),
 	}.Get()
 
 	if err != nil {
@@ -110,9 +106,8 @@ func IsValidToken(token string) StatusCode {
 func IsFingerprintValid(token, fingerprint string) StatusCode {
 	resp, err := req.Request{
 		URL:         DO_API + "/account/keys",
-		UserAgent:   USER_AGENT,
-		ContentType: "application/json",
-		Headers:     req.Headers{"Authorization": "Bearer " + token},
+		ContentType: req.CONTENT_TYPE_JSON,
+		Headers:     getAuthHeaders(token),
 	}.Get()
 
 	if err != nil {
@@ -141,9 +136,8 @@ func IsFingerprintValid(token, fingerprint string) StatusCode {
 func IsRegionValid(token, slug string) StatusCode {
 	resp, err := req.Request{
 		URL:         DO_API + "/regions",
-		UserAgent:   USER_AGENT,
-		ContentType: "application/json",
-		Headers:     req.Headers{"Authorization": "Bearer " + token},
+		ContentType: req.CONTENT_TYPE_JSON,
+		Headers:     getAuthHeaders(token),
 	}.Get()
 
 	if err != nil {
@@ -172,9 +166,8 @@ func IsRegionValid(token, slug string) StatusCode {
 func IsSizeValid(token, slug string) StatusCode {
 	resp, err := req.Request{
 		URL:         DO_API + "/sizes",
-		UserAgent:   USER_AGENT,
-		ContentType: "application/json",
-		Headers:     req.Headers{"Authorization": "Bearer " + token},
+		ContentType: req.CONTENT_TYPE_JSON,
+		Headers:     getAuthHeaders(token),
 	}.Get()
 
 	if err != nil {
@@ -213,9 +206,8 @@ func DestroyTerrafarmDroplets(token string) error {
 	for dropletName, dropletID := range droplets {
 		resp, err := req.Request{
 			URL:         DO_API + "/droplets/" + strconv.Itoa(dropletID),
-			UserAgent:   USER_AGENT,
-			ContentType: "application/json",
-			Headers:     req.Headers{"Authorization": "Bearer " + token},
+			ContentType: req.CONTENT_TYPE_JSON,
+			Headers:     getAuthHeaders(token),
 		}.Delete()
 
 		if err != nil {
@@ -239,17 +231,14 @@ func GetTerrafarmDropletsList(token string) (map[string]int, error) {
 
 	resp, err := req.Request{
 		URL:         DO_API + "/droplets",
-		UserAgent:   USER_AGENT,
-		ContentType: "application/json",
+		ContentType: req.CONTENT_TYPE_JSON,
 
 		Query: req.Query{
 			"page":     "1",
 			"per_page": "999",
 		},
 
-		Headers: req.Headers{
-			"Authorization": "Bearer " + token,
-		},
+		Headers: getAuthHeaders(token),
 	}.Get()
 
 	if err != nil {
@@ -274,3 +263,7 @@ func GetTerrafarmDropletsList(token string) (map[string]int, error) {
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
+
+func getAuthHeaders(token string) req.Headers {
+	return req.Headers{"Authorization": "Bearer " + token}
+}

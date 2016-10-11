@@ -97,17 +97,18 @@ Also keep in mind that Terrafarm works with Terraform and you should know how to
 ## Usage
 
 ```
-Usage: terrafarm <command> <options>
+Usage: terrafarm {command} {options}
 
-Commands:
+Commands
 
   create template-name    Create and run farm droplets on DigitalOcean
   destroy                 Destroy farm droplets on DigitalOcean
   status                  Show current Terrafarm preferences and status
   templates               List all available farm templates
   prolong ttl max-wait    Increase TTL or set max wait time
+  doctor                  Fix problems with farm
 
-Options:
+Options
 
   --ttl, -t time             Max farm TTL (Time To Live)
   --max-wait, -w time        Max time which monitor will wait if farm have active build
@@ -120,11 +121,12 @@ Options:
   --password, -P password    Build node user password
   --force, -f                Force command execution
   --no-validate, -nv         Don't validate preferences
+  --notify, -n               Ring the system bell after finishing command execution
   --no-color, -nc            Disable colors in output
   --help, -h                 Show this help message
   --version, -v              Show version
 
-Examples:
+Examples
 
   terrafarm create --node-size 8gb --ttl 3h
   Create farm with redefined node size and TTL
