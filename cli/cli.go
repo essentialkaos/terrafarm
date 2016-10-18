@@ -45,7 +45,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.10.3"
+	VER  = "0.10.4"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -575,7 +575,7 @@ func statusCommand(prefs *Preferences) {
 	fmtc.NewLine()
 
 	if !isTerrafarmActive() {
-		fmtc.Printf("  {*}%-16s{!} {s-}stopped{!}\n", "State:")
+		fmtc.Printf("  {*}%-16s{!} {s}stopped{!}\n", "State:")
 	} else {
 		fmtc.Printf("  {*}%-16s{!} {g}works{!}", "State:")
 
