@@ -45,7 +45,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.10.4"
+	VER  = "0.10.5"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -889,6 +889,7 @@ func doctorCommand(prefs *Preferences) {
 		exit(1)
 	}
 
+	fmtc.Println("Terrafarm monitor stoppped")
 	fmtc.Printf("  File %s removed\n", terraformStateFile)
 	fmtc.Printf("  File %s removed\n", terrafarmStateFile)
 
@@ -963,9 +964,9 @@ func printValidationMarker(value do.StatusCode, disableValidate bool) {
 // or red cross otherwise
 func printErrorStatusMarker(err error) {
 	if err == nil {
-		fmtc.Printf("{g}✔{!} ")
+		fmtc.Printf("{g}✔ {!}")
 	} else {
-		fmtc.Printf("{r}✘{!} ")
+		fmtc.Printf("{r}✘ {!}")
 	}
 }
 
