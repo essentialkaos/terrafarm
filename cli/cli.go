@@ -25,6 +25,7 @@ import (
 	"pkg.re/essentialkaos/ek.v5/fsutil"
 	"pkg.re/essentialkaos/ek.v5/jsonutil"
 	"pkg.re/essentialkaos/ek.v5/log"
+	"pkg.re/essentialkaos/ek.v5/mathutil"
 	"pkg.re/essentialkaos/ek.v5/path"
 	"pkg.re/essentialkaos/ek.v5/pluralize"
 	"pkg.re/essentialkaos/ek.v5/req"
@@ -45,7 +46,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.10.5"
+	VER  = "0.10.6"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -490,11 +491,13 @@ func statusCommand(prefs *Preferences) {
 
 	ttlHours = float64(prefs.TTL) / 60.0
 	totalUsagePriceMin = (ttlHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
+	totalUsagePriceMin = mathutil.BetweenF(totalUsagePriceMin, 0.01, 1000000.0)
 
 	if prefs.MaxWait > 0 {
 		ttlWaitHours := float64(prefs.MaxWait) / 60.0
 		totalUsagePriceMax = totalUsagePriceMin
 		totalUsagePriceMax += (ttlWaitHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
+		totalUsagePriceMax = mathutil.BetweenF(totalUsagePriceMax, 0.01, 1000000.0)
 	}
 
 	if monitorActive {
@@ -505,6 +508,7 @@ func statusCommand(prefs *Preferences) {
 			ttlRemain = state.DestroyAfter - time.Now().Unix()
 			usageHours := time.Since(time.Unix(state.Started, 0)).Hours()
 			currentUsagePrice = (usageHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
+			currentUsagePrice = mathutil.BetweenF(currentUsagePrice, 0.01, 1000000.0)
 		}
 
 		buildersBullets = getBuildBullets(prefs)
@@ -1168,6 +1172,7 @@ func getUsagePriceMessage() (string, string) {
 	usageHours := time.Since(time.Unix(state.Started, 0)).Hours()
 	usageMinutes := int(time.Since(time.Unix(state.Started, 0)).Minutes())
 	currentUsagePrice := (usageHours * dropletPrices[farmState.Preferences.NodeSize]) * float64(buildersTotal)
+	currentUsagePrice = mathutil.BetweenF(currentUsagePrice, 0.01, 1000000.0)
 
 	switch buildersTotal {
 	case 1:
