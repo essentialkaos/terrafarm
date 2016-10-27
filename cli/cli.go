@@ -213,15 +213,20 @@ var startTime = time.Now().Unix()
 
 // dropletPrices contains per-hour droplet prices
 var dropletPrices = map[string]float64{
-	"512mb": 0.007,
-	"1gb":   0.015,
-	"2gb":   0.030,
-	"4gb":   0.060,
-	"8gb":   0.119,
-	"16gb":  0.238,
-	"32gb":  0.426,
-	"48gb":  0.714,
-	"64gb":  0.952,
+	"512mb":   0.007,
+	"1gb":     0.015,
+	"2gb":     0.030,
+	"4gb":     0.060,
+	"8gb":     0.119,
+	"16gb":    0.238,
+	"32gb":    0.426,
+	"48gb":    0.714,
+	"64gb":    0.952,
+	"m-16gb":  0.179,
+	"m-32gb":  0.357,
+	"m-64gb":  0.714,
+	"m-128gb": 1.429,
+	"m-224gb": 2.500,
 }
 
 // temp is temp struct
