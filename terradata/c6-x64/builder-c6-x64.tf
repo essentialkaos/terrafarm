@@ -10,7 +10,7 @@ resource "digitalocean_droplet" "terrafarm-c6-x64" {
   connection {
     user = "root"
     type = "ssh"
-    key_file = "${var.key}"
+    private_key = "${file(var.key)}"
     timeout = "2m"
   }
 
