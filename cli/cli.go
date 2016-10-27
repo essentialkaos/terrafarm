@@ -182,22 +182,22 @@ func (p NodeInfoSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // argMap is map with supported command-line arguments
 var argMap = arg.Map{
-	ARG_TTL:         &arg.V{},
-	ARG_OUTPUT:      &arg.V{},
-	ARG_TOKEN:       &arg.V{},
-	ARG_KEY:         &arg.V{},
-	ARG_REGION:      &arg.V{},
-	ARG_NODE_SIZE:   &arg.V{},
-	ARG_USER:        &arg.V{},
-	ARG_MAX_WAIT:    &arg.V{},
-	ARG_DEBUG:       &arg.V{Type: arg.BOOL},
-	ARG_MONITOR:     &arg.V{},
-	ARG_FORCE:       &arg.V{Type: arg.BOOL},
-	ARG_NO_VALIDATE: &arg.V{Type: arg.BOOL},
-	ARG_NOTIFY:      &arg.V{Type: arg.BOOL},
-	ARG_NO_COLOR:    &arg.V{Type: arg.BOOL},
-	ARG_HELP:        &arg.V{Type: arg.BOOL, Alias: "u:usage"},
-	ARG_VER:         &arg.V{Type: arg.BOOL, Alias: "ver"},
+	ARG_TTL:         {},
+	ARG_OUTPUT:      {},
+	ARG_TOKEN:       {},
+	ARG_KEY:         {},
+	ARG_REGION:      {},
+	ARG_NODE_SIZE:   {},
+	ARG_USER:        {},
+	ARG_MAX_WAIT:    {},
+	ARG_DEBUG:       {Type: arg.BOOL},
+	ARG_MONITOR:     {},
+	ARG_FORCE:       {Type: arg.BOOL},
+	ARG_NO_VALIDATE: {Type: arg.BOOL},
+	ARG_NOTIFY:      {Type: arg.BOOL},
+	ARG_NO_COLOR:    {Type: arg.BOOL},
+	ARG_HELP:        {Type: arg.BOOL, Alias: "u:usage"},
+	ARG_VER:         {Type: arg.BOOL, Alias: "ver"},
 }
 
 // depList is slice with dependencies required by terrafarm
@@ -458,7 +458,6 @@ func statusCommand(prefs *Preferences) {
 		regionValid      do.StatusCode
 		sizeValid        do.StatusCode
 
-		ttlHours           float64
 		ttlRemain          int64
 		totalUsagePriceMin float64
 		totalUsagePriceMax float64
@@ -494,15 +493,11 @@ func statusCommand(prefs *Preferences) {
 
 	buildersTotal = getBuildNodesCount(prefs.Template)
 
-	ttlHours = float64(prefs.TTL) / 60.0
-	totalUsagePriceMin = (ttlHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
-	totalUsagePriceMin = mathutil.BetweenF(totalUsagePriceMin, 0.01, 1000000.0)
+	totalUsagePriceMin = calculateUsagePrice(prefs.TTL, buildersTotal, prefs.NodeSize)
 
 	if prefs.MaxWait > 0 {
-		ttlWaitHours := float64(prefs.MaxWait) / 60.0
 		totalUsagePriceMax = totalUsagePriceMin
-		totalUsagePriceMax += (ttlWaitHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
-		totalUsagePriceMax = mathutil.BetweenF(totalUsagePriceMax, 0.01, 1000000.0)
+		totalUsagePriceMax += calculateUsagePrice(prefs.MaxWait, buildersTotal, prefs.NodeSize)
 	}
 
 	if monitorActive {
@@ -511,9 +506,8 @@ func statusCommand(prefs *Preferences) {
 		if err == nil {
 			waitBuildComplete = state.MaxWait > 0
 			ttlRemain = state.DestroyAfter - time.Now().Unix()
-			usageHours := time.Since(time.Unix(state.Started, 0)).Hours()
-			currentUsagePrice = (usageHours * dropletPrices[prefs.NodeSize]) * float64(buildersTotal)
-			currentUsagePrice = mathutil.BetweenF(currentUsagePrice, 0.01, 1000000.0)
+			usageHours := int64(time.Since(time.Unix(state.Started, 0)).Hours() * 60)
+			currentUsagePrice = calculateUsagePrice(usageHours, buildersTotal, prefs.NodeSize)
 		}
 
 		buildersBullets = getBuildBullets(prefs)
@@ -741,10 +735,7 @@ func prolongCommand(args []string) {
 		exit(1)
 	}
 
-	var (
-		ttl     int64
-		maxWait int64
-	)
+	var ttl, maxWait int64
 
 	if len(args) >= 1 {
 		ttl = timeutil.ParseDuration(args[0]) / 60
@@ -1187,6 +1178,19 @@ func getUsagePriceMessage() (string, string) {
 		return fmtc.Sprintf("$%.2f", currentUsagePrice),
 			fmtc.Sprintf("%d × %s × %d min", buildersTotal, farmState.Preferences.NodeSize, usageMinutes)
 	}
+}
+
+// calculateUsagePrice calculate usage price
+func calculateUsagePrice(time int64, nodeNum int, nodeSize string) float64 {
+	if dropletPrices[nodeSize] == 0.0 {
+		return 0.0
+	}
+
+	hours := float64(time) / 60.0
+	price := (hours * dropletPrices[nodeSize]) * float64(nodeNum)
+	price = mathutil.BetweenF(price, 0.01, 1000000.0)
+
+	return price
 }
 
 // addSignalInterception add interceptors for INT и TERM signals
