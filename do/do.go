@@ -76,6 +76,10 @@ type Droplet struct {
 
 // IsValidToken return true if token valid and account is active
 func IsValidToken(token string) StatusCode {
+	if !isWellFormatedToken(token) {
+		return STATUS_NOT_OK
+	}
+
 	resp, err := req.Request{
 		URL:         DO_API + "/account",
 		ContentType: req.CONTENT_TYPE_JSON,
@@ -86,6 +90,10 @@ func IsValidToken(token string) StatusCode {
 		return STATUS_ERROR
 	}
 
+	if resp.StatusCode != 200 {
+		return STATUS_NOT_OK
+	}
+
 	accountInfo := &AccountInfo{}
 
 	err = resp.JSON(accountInfo)
@@ -94,16 +102,20 @@ func IsValidToken(token string) StatusCode {
 		return STATUS_ERROR
 	}
 
-	if accountInfo.Account.Status == "active" {
-		return STATUS_OK
+	if accountInfo.Account.Status != "active" {
+		return STATUS_NOT_OK
 	}
 
-	return STATUS_NOT_OK
+	return STATUS_OK
 }
 
 // IsFingerprintValid return tru if provate key with given fingerprint is
 // present in Digital Ocean account
 func IsFingerprintValid(token, fingerprint string) StatusCode {
+	if !isWellFormatedToken(token) {
+		return STATUS_NOT_OK
+	}
+
 	resp, err := req.Request{
 		URL:         DO_API + "/account/keys",
 		ContentType: req.CONTENT_TYPE_JSON,
@@ -112,6 +124,10 @@ func IsFingerprintValid(token, fingerprint string) StatusCode {
 
 	if err != nil {
 		return STATUS_ERROR
+	}
+
+	if resp.StatusCode != 200 {
+		return STATUS_NOT_OK
 	}
 
 	keysInfo := &KeysInfo{}
@@ -134,6 +150,10 @@ func IsFingerprintValid(token, fingerprint string) StatusCode {
 // IsRegionValid return true if region with given slug is present
 // on Digital Ocean
 func IsRegionValid(token, slug string) StatusCode {
+	if !isWellFormatedToken(token) {
+		return STATUS_NOT_OK
+	}
+
 	resp, err := req.Request{
 		URL:         DO_API + "/regions",
 		ContentType: req.CONTENT_TYPE_JSON,
@@ -142,6 +162,10 @@ func IsRegionValid(token, slug string) StatusCode {
 
 	if err != nil {
 		return STATUS_ERROR
+	}
+
+	if resp.StatusCode != 200 {
+		return STATUS_NOT_OK
 	}
 
 	regionsInfo := &RegionsInfo{}
@@ -164,6 +188,10 @@ func IsRegionValid(token, slug string) StatusCode {
 // IsSizeValid return true if size with given slug is present
 // on Digital Ocean
 func IsSizeValid(token, slug string) StatusCode {
+	if !isWellFormatedToken(token) {
+		return STATUS_NOT_OK
+	}
+
 	resp, err := req.Request{
 		URL:         DO_API + "/sizes",
 		ContentType: req.CONTENT_TYPE_JSON,
@@ -172,6 +200,10 @@ func IsSizeValid(token, slug string) StatusCode {
 
 	if err != nil {
 		return STATUS_ERROR
+	}
+
+	if resp.StatusCode != 200 {
+		return STATUS_NOT_OK
 	}
 
 	sizesInfo := &SizesInfo{}
@@ -193,6 +225,10 @@ func IsSizeValid(token, slug string) StatusCode {
 
 // DestroyTerrafarmDroplets destroy terrafarm droplets
 func DestroyTerrafarmDroplets(token string) error {
+	if !isWellFormatedToken(token) {
+		return fmt.Errorf("Token is misformatted")
+	}
+
 	droplets, err := GetTerrafarmDropletsList(token)
 
 	if err != nil {
@@ -227,6 +263,10 @@ func DestroyTerrafarmDroplets(token string) error {
 
 // GetTerrafarmDropletsList return map name->id
 func GetTerrafarmDropletsList(token string) (map[string]int, error) {
+	if !isWellFormatedToken(token) {
+		return nil, fmt.Errorf("Token is misformatted")
+	}
+
 	var result = make(map[string]int)
 
 	resp, err := req.Request{
@@ -263,6 +303,14 @@ func GetTerrafarmDropletsList(token string) (map[string]int, error) {
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
+
+func isWellFormatedToken(token string) bool {
+	if len(token) != 64 {
+		return false
+	}
+
+	return true
+}
 
 func getAuthHeaders(token string) req.Headers {
 	return req.Headers{"Authorization": "Bearer " + token}
