@@ -1451,6 +1451,8 @@ func exit(code int) {
 
 // showUsage show help content
 func showUsage() {
+	usage.Breadcrumbs = true
+
 	info := usage.NewInfo("")
 
 	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean", "template-name")
