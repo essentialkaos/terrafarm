@@ -239,6 +239,11 @@ func validatePreferences(prefs *Preferences) {
 		hasErrors = true
 	}
 
+	if len(prefs.Token) != 64 {
+		terminal.PrintErrorMessage("Property token must is misformatted")
+		hasErrors = true
+	}
+
 	if prefs.Region == "" {
 		terminal.PrintErrorMessage("Property region must be set")
 		hasErrors = true

@@ -46,7 +46,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.10.7"
+	VER  = "0.10.8"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -1451,6 +1451,8 @@ func exit(code int) {
 
 // showUsage show help content
 func showUsage() {
+	usage.Breadcrumbs = true
+
 	info := usage.NewInfo("")
 
 	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean", "template-name")
