@@ -46,7 +46,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.10.8"
+	VER  = "0.10.9"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -889,7 +889,7 @@ func doctorCommand(prefs *Preferences) {
 		exit(1)
 	}
 
-	fmtc.Println("Terrafarm monitor stoppped")
+	fmtc.Println("  Terrafarm monitor stoppped")
 	fmtc.Printf("  File %s removed\n", terraformStateFile)
 	fmtc.Printf("  File %s removed\n", terrafarmStateFile)
 
@@ -909,19 +909,15 @@ func doctorCommand(prefs *Preferences) {
 	fmtc.NewLine()
 
 	printErrorStatusMarker(killMonitorProcess())
-
 	fmtc.Println("Terrafarm monitor stoppped")
 
 	printErrorStatusMarker(os.Remove(terraformStateFile))
-
 	fmtc.Printf("File %s removed\n", terraformStateFile)
 
 	printErrorStatusMarker(os.Remove(terrafarmStateFile))
-
 	fmtc.Printf("File %s removed\n", terrafarmStateFile)
 
 	printErrorStatusMarker(do.DestroyTerrafarmDroplets(prefs.Token))
-
 	fmtc.Println("Terrafarm droplets destroyed")
 
 	fmtc.NewLine()
