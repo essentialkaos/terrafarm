@@ -29,7 +29,7 @@ resource "digitalocean_droplet" "terrafarm-c6-x48" {
       "yum -y -q update",
       "echo 'Installing DevToolSet repo...'",
       "rpm --import https://linux.web.cern.ch/linux/scientific6/docs/repository/cern/slc6X/i386/RPM-GPG-KEY-cern",
-      "curl -o /etc/yum.repos.d/slc6-devtoolset.repo https://linux.web.cern.ch/linux/scientific6/docs/repository/cern/devtoolset/slc6-devtoolset.repo",
+      "curl -ss -o /etc/yum.repos.d/slc6-devtoolset.repo https://linux.web.cern.ch/linux/scientific6/docs/repository/cern/devtoolset/slc6-devtoolset.repo",
       "echo 'Installing RPMBuilder Node package...'",
       "yum -y -q install rpmbuilder-node",
       "echo 'Starting node configuration...'",
