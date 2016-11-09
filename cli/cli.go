@@ -46,7 +46,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.10.9"
+	VER  = "0.11.0"
 	DESC = "Utility for working with terraform based rpmbuilder farm"
 )
 
@@ -157,6 +157,7 @@ const SEPARATOR = "-------------------------------------------------------------
 type FarmState struct {
 	Preferences *Preferences `json:"preferences"`
 	Fingerprint string       `json:"fingerprint"`
+	Started     int64        `json:"started"`
 }
 
 // NodeInfo contains info about build node
@@ -191,7 +192,7 @@ var argMap = arg.Map{
 	ARG_USER:        {},
 	ARG_MAX_WAIT:    {},
 	ARG_DEBUG:       {Type: arg.BOOL},
-	ARG_MONITOR:     {},
+	ARG_MONITOR:     {Type: arg.BOOL},
 	ARG_FORCE:       {Type: arg.BOOL},
 	ARG_NO_VALIDATE: {Type: arg.BOOL},
 	ARG_NOTIFY:      {Type: arg.BOOL},
@@ -261,7 +262,7 @@ func Init() {
 		return
 	}
 
-	if !arg.Has(ARG_MONITOR) && len(args) == 0 {
+	if !arg.GetB(ARG_MONITOR) && len(args) == 0 {
 		showUsage()
 		return
 	}
@@ -270,7 +271,7 @@ func Init() {
 	checkEnv()
 	checkDeps()
 
-	if arg.Has(ARG_MONITOR) {
+	if arg.GetB(ARG_MONITOR) {
 		startFarmMonitor()
 	} else {
 		processCommand(args[0], args[1:])
@@ -394,6 +395,9 @@ func createCommand(prefs *Preferences, args []string) {
 		fmtc.Printf("{s-}EXEC → terraform apply %s{!}\n\n", strings.Join(vars, " "))
 	}
 
+	// Current moment + 90 seconds for starting droplets
+	farmStartTime := time.Now().Unix() + 90
+
 	fsutil.Push(path.Join(getDataDir(), prefs.Template))
 
 	err = execTerraform(false, "apply", vars)
@@ -430,6 +434,17 @@ func createCommand(prefs *Preferences, args []string) {
 	if prefs.TTL > 0 {
 		fmtc.Printf("Starting monitoring process... ")
 
+		err = saveMonitorState(&MonitorState{
+			DestroyAfter: time.Now().Unix() + prefs.TTL*60,
+			MaxWait:      prefs.MaxWait * 60,
+		})
+
+		if err != nil {
+			fmtc.NewLine()
+			terminal.PrintErrorMessage("Error while saving monitoring process state: %v", err)
+			exit(1)
+		}
+
 		err = startMonitorProcess(prefs, false)
 
 		if err != nil {
@@ -443,7 +458,7 @@ func createCommand(prefs *Preferences, args []string) {
 		fmtutil.Separator(false)
 	}
 
-	saveState(prefs)
+	saveState(prefs, farmStartTime)
 
 	if arg.GetB(ARG_NOTIFY) {
 		fmtc.Bell()
@@ -453,6 +468,11 @@ func createCommand(prefs *Preferences, args []string) {
 // statusCommand is status command handler
 func statusCommand(prefs *Preferences) {
 	var (
+		err error
+
+		farmState    *FarmState
+		monitorState *MonitorState
+
 		tokenValid       do.StatusCode
 		fingerprintValid do.StatusCode
 		regionValid      do.StatusCode
@@ -482,7 +502,7 @@ func statusCommand(prefs *Preferences) {
 	fingerprint, _ = getFingerprint(prefs.Key + ".pub")
 
 	if terrafarmActive {
-		farmState, err := readFarmState()
+		farmState, err = readFarmState()
 
 		if err == nil {
 			disableValidation = true
@@ -495,19 +515,22 @@ func statusCommand(prefs *Preferences) {
 
 	totalUsagePriceMin = calculateUsagePrice(prefs.TTL, buildersTotal, prefs.NodeSize)
 
+	if terrafarmActive {
+		usageHours := int64(time.Since(time.Unix(farmState.Started, 0)).Hours() * 60)
+		currentUsagePrice = calculateUsagePrice(usageHours, buildersTotal, prefs.NodeSize)
+	}
+
 	if prefs.MaxWait > 0 {
 		totalUsagePriceMax = totalUsagePriceMin
 		totalUsagePriceMax += calculateUsagePrice(prefs.MaxWait, buildersTotal, prefs.NodeSize)
 	}
 
 	if monitorActive {
-		state, err := readMonitorState()
+		monitorState, err = readMonitorState()
 
 		if err == nil {
-			waitBuildComplete = state.MaxWait > 0
-			ttlRemain = state.DestroyAfter - time.Now().Unix()
-			usageHours := int64(time.Since(time.Unix(state.Started, 0)).Hours() * 60)
-			currentUsagePrice = calculateUsagePrice(usageHours, buildersTotal, prefs.NodeSize)
+			waitBuildComplete = monitorState.MaxWait > 0
+			ttlRemain = monitorState.DestroyAfter - time.Now().Unix()
 		}
 
 		buildersBullets = getBuildBullets(prefs)
@@ -924,12 +947,13 @@ func doctorCommand(prefs *Preferences) {
 }
 
 // saveFarmState collect and save farm state into file
-func saveState(prefs *Preferences) {
+func saveState(prefs *Preferences, farmStartTime int64) {
 	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
 
 	farmState := &FarmState{
 		Preferences: prefs,
 		Fingerprint: fingerprint,
+		Started:     farmStartTime,
 	}
 
 	farmState.Preferences.Token = getCryptedToken(prefs.Token)
@@ -1017,7 +1041,7 @@ func getBuildBullets(prefs *Preferences) string {
 			result += "{g}•{!}"
 
 		case STATE_INACTIVE:
-			result += "{s-}•{!}"
+			result += "{s}•{!}"
 
 		default:
 			result += "{r}•{!}"
@@ -1148,12 +1172,6 @@ func getUsagePriceMessage() (string, string) {
 		return "", ""
 	}
 
-	state, err := readMonitorState()
-
-	if err != nil {
-		return "", ""
-	}
-
 	farmState, err := readFarmState()
 
 	if err != nil {
@@ -1161,8 +1179,8 @@ func getUsagePriceMessage() (string, string) {
 	}
 
 	buildersTotal := getBuildNodesCount(farmState.Preferences.Template)
-	usageHours := time.Since(time.Unix(state.Started, 0)).Hours()
-	usageMinutes := int(time.Since(time.Unix(state.Started, 0)).Minutes())
+	usageHours := time.Since(time.Unix(farmState.Started, 0)).Hours()
+	usageMinutes := int(time.Since(time.Unix(farmState.Started, 0)).Minutes())
 	currentUsagePrice := (usageHours * dropletPrices[farmState.Preferences.NodeSize]) * float64(buildersTotal)
 	currentUsagePrice = mathutil.BetweenF(currentUsagePrice, 0.01, 1000000.0)
 
