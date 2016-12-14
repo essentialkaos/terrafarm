@@ -149,7 +149,7 @@ func runMonitoringLoop(destroyAfter time.Time, maxWait int64) {
 func destroyFarmByMonitor() bool {
 	log.Info("Starting farm destroying...")
 
-	prefs := findAndReadPreferences()
+	prefs := getPreferences()
 	vars, err := prefsToArgs(prefs, "-no-color", "-force")
 
 	if err != nil {
@@ -279,7 +279,7 @@ func readMonitorState() (*MonitorState, error) {
 }
 
 // startMonitorProcess start or restart monitoring process
-func startMonitorProcess(prefs *Preferences, restart bool) error {
+func startMonitorProcess(restart bool) error {
 	cmd := exec.Command("terrafarm", "--monitor")
 	err := cmd.Start()
 

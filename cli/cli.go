@@ -9,8 +9,6 @@ package cli
 
 import (
 	"bufio"
-	"crypto"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"runtime"
@@ -36,9 +34,9 @@ import (
 	"pkg.re/essentialkaos/ek.v5/tmp"
 	"pkg.re/essentialkaos/ek.v5/usage"
 
-	sshkey "github.com/yosida95/golang-sshkey"
-
 	"github.com/essentialkaos/terrafarm/do"
+	"github.com/essentialkaos/terrafarm/prefs"
+	"github.com/essentialkaos/terrafarm/terraform"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -47,7 +45,7 @@ import (
 const (
 	APP  = "Terrafarm"
 	VER  = "0.11.0"
-	DESC = "Utility for working with terraform based rpmbuilder farm"
+	DESC = "Utility for working with terraform based RPMBuilder farm"
 )
 
 // List of supported command-line arguments
@@ -93,35 +91,6 @@ const (
 	CMD_PROLONG_SHORTCUT   = "p"
 )
 
-// List of supported environment variables
-const (
-	EV_DATA      = "TERRAFARM_DATA"
-	EV_TTL       = "TERRAFARM_TTL"
-	EV_MAX_WAIT  = "TERRAFARM_MAX_WAIT"
-	EV_OUTPUT    = "TERRAFARM_OUTPUT"
-	EV_TEMPLATE  = "TERRAFARM_TEMPLATE"
-	EV_TOKEN     = "TERRAFARM_TOKEN"
-	EV_KEY       = "TERRAFARM_KEY"
-	EV_REGION    = "TERRAFARM_REGION"
-	EV_NODE_SIZE = "TERRAFARM_NODE_SIZE"
-	EV_USER      = "TERRAFARM_USER"
-	EV_PASSWORD  = "TERRAFARM_PASSWORD"
-)
-
-// List of supported preferences
-const (
-	PREFS_TTL       = "ttl"
-	PREFS_MAX_WAIT  = "max-wait"
-	PREFS_OUTPUT    = "output"
-	PREFS_TEMPLATE  = "template"
-	PREFS_TOKEN     = "token"
-	PREFS_KEY       = "key"
-	PREFS_REGION    = "region"
-	PREFS_NODE_SIZE = "node-size"
-	PREFS_USER      = "user"
-	PREFS_PASSWORD  = "password"
-)
-
 // List of build node states
 const (
 	STATE_UNKNOWN uint8 = iota
@@ -129,6 +98,9 @@ const (
 	STATE_ACTIVE
 	STATE_DOWN
 )
+
+// Environment variable with path to data
+const EV_DATA = "TERRAFARM_DATA"
 
 // TERRAFORM_DATA_DIR is name of directory with terraform data
 const TERRAFORM_DATA_DIR = "terradata"
@@ -155,9 +127,8 @@ const SEPARATOR = "-------------------------------------------------------------
 
 // FarmState contains farm specific info
 type FarmState struct {
-	Preferences *Preferences `json:"preferences"`
-	Fingerprint string       `json:"fingerprint"`
-	Started     int64        `json:"started"`
+	Preferences *prefs.Preferences `json:"preferences"`
+	Started     int64              `json:"started"`
 }
 
 // NodeInfo contains info about build node
@@ -338,17 +309,17 @@ func processCommand(cmd string, args []string) {
 
 	switch cmd {
 	case CMD_CREATE, CMD_APPLY, CMD_START, CMD_CREATE_SHORTCUT:
-		createCommand(findAndReadPreferences(), args)
+		createCommand(getPreferences(), args)
 	case CMD_DESTROY, CMD_DELETE, CMD_STOP, CMD_DESTROY_SHORTCUT:
-		destroyCommand(findAndReadPreferences())
+		destroyCommand(getPreferences())
 	case CMD_STATUS, CMD_INFO, CMD_STATE, CMD_STATUS_SHORTCUT:
-		statusCommand(findAndReadPreferences())
+		statusCommand(getPreferences())
 	case CMD_TEMPLATES, CMD_TEMPLATES_SHORTCUT:
 		templatesCommand()
 	case CMD_PROLONG, CMD_PROLONG_SHORTCUT:
 		prolongCommand(args)
 	case CMD_DOCTOR:
-		doctorCommand(findAndReadPreferences())
+		doctorCommand(getPreferences())
 	default:
 		terminal.PrintErrorMessage("Unknown command %s", cmd)
 		exit(1)
@@ -358,18 +329,18 @@ func processCommand(cmd string, args []string) {
 }
 
 // createCommand is create command handler
-func createCommand(prefs *Preferences, args []string) {
+func createCommand(p *prefs.Preferences, args []string) {
 	if isTerrafarmActive() {
 		terminal.PrintWarnMessage("Terrafarm already works")
 		exit(1)
 	}
 
 	if len(args) != 0 {
-		prefs.Template = args[0]
-		validatePreferences(prefs)
+		p.Template = args[0]
+		validatePreferences(p)
 	}
 
-	statusCommand(prefs)
+	statusCommand(p)
 
 	if !arg.GetB(ARG_FORCE) {
 		yes, err := terminal.ReadAnswer("Create farm with this preferences?", "n")
@@ -382,7 +353,7 @@ func createCommand(prefs *Preferences, args []string) {
 		fmtutil.Separator(false)
 	}
 
-	vars, err := prefsToArgs(prefs)
+	vars, err := prefsToArgs(p)
 
 	if err != nil {
 		terminal.PrintErrorMessage("Can't parse preferences: %v", err)
@@ -398,7 +369,7 @@ func createCommand(prefs *Preferences, args []string) {
 	// Current moment + 90 seconds for starting droplets
 	farmStartTime := time.Now().Unix() + 90
 
-	fsutil.Push(path.Join(getDataDir(), prefs.Template))
+	fsutil.Push(path.Join(getDataDir(), p.Template))
 
 	err = execTerraform(false, "apply", vars)
 
@@ -411,32 +382,32 @@ func createCommand(prefs *Preferences, args []string) {
 
 	fmtutil.Separator(false)
 
-	if prefs.Output != "" {
+	if p.Output != "" {
 		fmtc.Println("Exporting info about build nodes...")
 
-		err = exportNodeList(prefs)
+		err = exportNodeList(p)
 
 		if err != nil {
 			terminal.PrintErrorMessage("Error while exporting info: %v", err)
 		} else {
-			fmtc.Printf("{g}Info about build nodes saved as %s{!}\n", prefs.Output)
+			fmtc.Printf("{g}Info about build nodes saved as %s{!}\n", p.Output)
 		}
 
 		fmtutil.Separator(false)
 	} else {
 		fmtc.Println("Access credentials for created build nodes:\n")
 
-		printNodesInfo(prefs)
+		printNodesInfo(p)
 
 		fmtutil.Separator(false)
 	}
 
-	if prefs.TTL > 0 {
+	if p.TTL > 0 {
 		fmtc.Printf("Starting monitoring process... ")
 
 		err = saveMonitorState(&MonitorState{
-			DestroyAfter: time.Now().Unix() + prefs.TTL*60,
-			MaxWait:      prefs.MaxWait * 60,
+			DestroyAfter: time.Now().Unix() + p.TTL*60,
+			MaxWait:      p.MaxWait * 60,
 		})
 
 		if err != nil {
@@ -445,7 +416,7 @@ func createCommand(prefs *Preferences, args []string) {
 			exit(1)
 		}
 
-		err = startMonitorProcess(prefs, false)
+		err = startMonitorProcess(false)
 
 		if err != nil {
 			fmtc.NewLine()
@@ -458,7 +429,7 @@ func createCommand(prefs *Preferences, args []string) {
 		fmtutil.Separator(false)
 	}
 
-	saveState(prefs, farmStartTime)
+	saveState(p, farmStartTime)
 
 	if arg.GetB(ARG_NOTIFY) {
 		fmtc.Bell()
@@ -466,7 +437,7 @@ func createCommand(prefs *Preferences, args []string) {
 }
 
 // statusCommand is status command handler
-func statusCommand(prefs *Preferences) {
+func statusCommand(p *prefs.Preferences) {
 	var (
 		err error
 
@@ -489,8 +460,6 @@ func statusCommand(prefs *Preferences) {
 
 		buildersTotal   int
 		buildersBullets string
-
-		fingerprint string
 	)
 
 	var (
@@ -499,30 +468,28 @@ func statusCommand(prefs *Preferences) {
 	)
 
 	disableValidation = arg.GetB(ARG_NO_VALIDATE)
-	fingerprint, _ = getFingerprint(prefs.Key + ".pub")
 
 	if terrafarmActive {
 		farmState, err = readFarmState()
 
 		if err == nil {
 			disableValidation = true
-			prefs = farmState.Preferences
-			fingerprint = farmState.Fingerprint
+			p = farmState.Preferences
 		}
 	}
 
-	buildersTotal = getBuildNodesCount(prefs.Template)
+	buildersTotal = getBuildNodesCount(p.Template)
 
-	totalUsagePriceMin = calculateUsagePrice(prefs.TTL, buildersTotal, prefs.NodeSize)
+	totalUsagePriceMin = calculateUsagePrice(p.TTL, buildersTotal, p.NodeSize)
 
 	if terrafarmActive {
 		usageHours := int64(time.Since(time.Unix(farmState.Started, 0)).Hours() * 60)
-		currentUsagePrice = calculateUsagePrice(usageHours, buildersTotal, prefs.NodeSize)
+		currentUsagePrice = calculateUsagePrice(usageHours, buildersTotal, p.NodeSize)
 	}
 
-	if prefs.MaxWait > 0 {
+	if p.MaxWait > 0 {
 		totalUsagePriceMax = totalUsagePriceMin
-		totalUsagePriceMax += calculateUsagePrice(prefs.MaxWait, buildersTotal, prefs.NodeSize)
+		totalUsagePriceMax += calculateUsagePrice(p.MaxWait, buildersTotal, p.NodeSize)
 	}
 
 	if monitorActive {
@@ -533,50 +500,50 @@ func statusCommand(prefs *Preferences) {
 			ttlRemain = monitorState.DestroyAfter - time.Now().Unix()
 		}
 
-		buildersBullets = getBuildBullets(prefs)
+		buildersBullets = getBuildBullets(p)
 	}
 
 	if !disableValidation {
-		tokenValid = do.IsValidToken(prefs.Token)
-		fingerprintValid = do.IsFingerprintValid(prefs.Token, fingerprint)
-		regionValid = do.IsRegionValid(prefs.Token, prefs.Region)
-		sizeValid = do.IsSizeValid(prefs.Token, prefs.NodeSize)
+		tokenValid = do.IsValidToken(p.Token)
+		fingerprintValid = do.IsFingerprintValid(p.Token, p.Fingerprint)
+		regionValid = do.IsRegionValid(p.Token, p.Region)
+		sizeValid = do.IsSizeValid(p.Token, p.NodeSize)
 	}
 
 	fmtutil.Separator(false, "TERRAFARM")
 
 	fmtc.Printf(
-		"  {*}%-16s{!} %s {s-}(%s){!}\n", "Template:", prefs.Template,
+		"  {*}%-16s{!} %s {s-}(%s){!}\n", "Template:", p.Template,
 		pluralize.Pluralize(buildersTotal, "build node", "build nodes"),
 	)
 
-	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
+	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(p.Token))
 
 	printValidationMarker(tokenValid, disableValidation)
 
-	fmtc.Printf("  {*}%-16s{!} %s\n", "Private Key:", prefs.Key)
-	fmtc.Printf("  {*}%-16s{!} %s\n", "Public Key:", prefs.Key+".pub")
+	fmtc.Printf("  {*}%-16s{!} %s\n", "Private Key:", p.Key)
+	fmtc.Printf("  {*}%-16s{!} %s\n", "Public Key:", p.Key+".pub")
 
-	fmtc.Printf("  {*}%-16s{!} %s", "Fingerprint:", fingerprint)
+	fmtc.Printf("  {*}%-16s{!} %s", "Fingerprint:", p.Fingerprint)
 
 	printValidationMarker(fingerprintValid, disableValidation)
 
 	switch {
-	case prefs.TTL <= 0:
+	case p.TTL <= 0:
 		fmtc.Printf("  {*}%-16s{!} {r}disabled{!}", "TTL:")
-	case prefs.TTL > 360:
-		fmtc.Printf("  {*}%-16s{!} {r}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
-	case prefs.TTL > 120:
-		fmtc.Printf("  {*}%-16s{!} {y}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+	case p.TTL > 360:
+		fmtc.Printf("  {*}%-16s{!} {r}%s{!}", "TTL:", timeutil.PrettyDuration(p.TTL*60))
+	case p.TTL > 120:
+		fmtc.Printf("  {*}%-16s{!} {y}%s{!}", "TTL:", timeutil.PrettyDuration(p.TTL*60))
 	default:
-		fmtc.Printf("  {*}%-16s{!} {g}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+		fmtc.Printf("  {*}%-16s{!} {g}%s{!}", "TTL:", timeutil.PrettyDuration(p.TTL*60))
 	}
 
-	if prefs.MaxWait > 0 {
-		fmtc.Printf("{s-} + %s wait{!}", pluralize.Pluralize(int(prefs.MaxWait), "minute", "minutes"))
+	if p.MaxWait > 0 {
+		fmtc.Printf("{s-} + %s wait{!}", pluralize.Pluralize(int(p.MaxWait), "minute", "minutes"))
 	}
 
-	if prefs.TTL <= 0 || totalUsagePriceMin <= 0 {
+	if p.TTL <= 0 || totalUsagePriceMin <= 0 {
 		fmtc.NewLine()
 	} else if totalUsagePriceMin > 0 && totalUsagePriceMax > 0 {
 		fmtc.Printf(" {s-}(~ $%.2f - $%.2f){!}\n", totalUsagePriceMin, totalUsagePriceMax)
@@ -584,18 +551,18 @@ func statusCommand(prefs *Preferences) {
 		fmtc.Printf(" {s-}(~ $%.2f){!}\n", totalUsagePriceMin)
 	}
 
-	fmtc.Printf("  {*}%-16s{!} %s", "Region:", prefs.Region)
+	fmtc.Printf("  {*}%-16s{!} %s", "Region:", p.Region)
 
 	printValidationMarker(regionValid, disableValidation)
 
-	fmtc.Printf("  {*}%-16s{!} %s", "Node size:", prefs.NodeSize)
+	fmtc.Printf("  {*}%-16s{!} %s", "Node size:", p.NodeSize)
 
 	printValidationMarker(sizeValid, disableValidation)
 
-	fmtc.Printf("  {*}%-16s{!} %s\n", "User:", prefs.User)
+	fmtc.Printf("  {*}%-16s{!} %s\n", "User:", p.User)
 
-	if prefs.Output != "" {
-		fmtc.Printf("  {*}%-16s{!} %s\n", "Output:", prefs.Output)
+	if p.Output != "" {
+		fmtc.Printf("  {*}%-16s{!} %s\n", "Output:", p.Output)
 	}
 
 	fmtc.NewLine()
@@ -639,13 +606,13 @@ func statusCommand(prefs *Preferences) {
 }
 
 // destroyCommand is destroy command handler
-func destroyCommand(prefs *Preferences) {
+func destroyCommand(p *prefs.Preferences) {
 	if !isTerrafarmActive() {
 		terminal.PrintWarnMessage("Terrafarm does not works, nothing to destroy")
 		exit(1)
 	}
 
-	activeBuildNodesCount := getActiveBuildNodesCount(prefs)
+	activeBuildNodesCount := getActiveBuildNodesCount(p)
 
 	if !arg.GetB(ARG_FORCE) {
 		fmtc.NewLine()
@@ -676,7 +643,7 @@ func destroyCommand(prefs *Preferences) {
 
 	priceMessage, priceMessageComment := getUsagePriceMessage()
 
-	vars, err := prefsToArgs(prefs, "-force")
+	vars, err := prefsToArgs(p, "-force")
 
 	if err != nil {
 		terminal.PrintErrorMessage("Can't parse prefs: %v", err)
@@ -689,7 +656,7 @@ func destroyCommand(prefs *Preferences) {
 		fmtc.Printf("{s-}EXEC → terraform destroy %s{!}\n\n", strings.Join(vars, " "))
 	}
 
-	fsutil.Push(path.Join(getDataDir(), prefs.Template))
+	fsutil.Push(path.Join(getDataDir(), p.Template))
 
 	err = execTerraform(false, "destroy", vars)
 
@@ -870,7 +837,7 @@ func prolongCommand(args []string) {
 
 	fmtc.Printf("Starting monitoring process... ")
 
-	err = startMonitorProcess(farmState.Preferences, true)
+	err = startMonitorProcess(true)
 
 	if err != nil {
 		terminal.PrintErrorMessage("ERROR\n")
@@ -884,7 +851,7 @@ func prolongCommand(args []string) {
 }
 
 // doctorCommand fix problems with farm
-func doctorCommand(prefs *Preferences) {
+func doctorCommand(p *prefs.Preferences) {
 	fmtc.Println("\nThis command can solve almost all problems that can occur with farm.")
 	fmtc.Println("This is list of actions which will be performed:\n")
 
@@ -905,7 +872,7 @@ func doctorCommand(prefs *Preferences) {
 	terraformStateFile := getTerraformStateFilePath()
 	terrafarmStateFile := getFarmStateFilePath()
 
-	terrafarmDroplets, err := do.GetTerrafarmDropletsList(prefs.Token)
+	terrafarmDroplets, err := do.GetTerrafarmDropletsList(p.Token)
 
 	if err != nil {
 		terminal.PrintErrorMessage(err.Error())
@@ -940,23 +907,20 @@ func doctorCommand(prefs *Preferences) {
 	printErrorStatusMarker(os.Remove(terrafarmStateFile))
 	fmtc.Printf("File %s removed\n", terrafarmStateFile)
 
-	printErrorStatusMarker(do.DestroyTerrafarmDroplets(prefs.Token))
+	printErrorStatusMarker(do.DestroyTerrafarmDroplets(p.Token))
 	fmtc.Println("Terrafarm droplets destroyed")
 
 	fmtc.NewLine()
 }
 
 // saveFarmState collect and save farm state into file
-func saveState(prefs *Preferences, farmStartTime int64) {
-	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
-
+func saveState(p *prefs.Preferences, farmStartTime int64) {
 	farmState := &FarmState{
-		Preferences: prefs,
-		Fingerprint: fingerprint,
+		Preferences: p,
 		Started:     farmStartTime,
 	}
 
-	farmState.Preferences.Token = getCryptedToken(prefs.Token)
+	farmState.Preferences.Token = getCryptedToken(p.Token)
 	farmState.Preferences.Password = ""
 
 	err := saveFarmState(farmState)
@@ -990,23 +954,6 @@ func printErrorStatusMarker(err error) {
 	}
 }
 
-// getFingerprint return fingerprint for public key
-func getFingerprint(key string) (string, error) {
-	data, err := ioutil.ReadFile(key)
-
-	if err != nil {
-		return "", err
-	}
-
-	pubkey, err := sshkey.UnmarshalPublicKey(string(data[:]))
-
-	if err != nil {
-		return "", err
-	}
-
-	return sshkey.PrettyFingerprint(pubkey, crypto.MD5)
-}
-
 // getMaskedToken return first and last 8 symbols of token
 func getMaskedToken(token string) string {
 	if len(token) != 64 {
@@ -1026,8 +973,8 @@ func getCryptedToken(token string) string {
 }
 
 // getBuildBullets return colored string with bullets
-func getBuildBullets(prefs *Preferences) string {
-	nodes := getBuildNodesInfo(prefs)
+func getBuildBullets(p *prefs.Preferences) string {
+	nodes := getBuildNodesInfo(p)
 
 	if len(nodes) == 0 {
 		return "{y}unknown{!}"
@@ -1052,8 +999,8 @@ func getBuildBullets(prefs *Preferences) string {
 }
 
 // prefsToArgs return preferences as command line arguments for terraform
-func prefsToArgs(prefs *Preferences, args ...string) ([]string, error) {
-	varsData, err := prefs.GetVariablesData()
+func prefsToArgs(p *prefs.Preferences, args ...string) ([]string, error) {
+	varsData, err := p.GetVariablesData()
 
 	if err != nil {
 		return nil, err
@@ -1146,6 +1093,33 @@ func execTerraform(logOutput bool, command string, args []string) error {
 	return nil
 }
 
+// getPreferencies
+func getPreferences() *prefs.Preferences {
+	p, errs := prefs.FindAndReadPreferences(getDataDir())
+
+	if len(errs) != 0 {
+		for _, err := range errs {
+			terminal.PrintErrorMessage(err.Error())
+		}
+
+		os.Exit(1)
+	}
+
+	return p
+}
+
+func validatePreferences(p *prefs.Preferences) {
+	errs := p.Validate(getDataDir())
+
+	if len(errs) != 0 {
+		for _, err := range errs {
+			terminal.PrintErrorMessage(err.Error())
+		}
+
+		os.Exit(1)
+	}
+}
+
 // getColoredCommandOutput return command output with colored remote-exec
 func getColoredCommandOutput(line string) string {
 	// Remove garbage from line
@@ -1223,13 +1197,13 @@ func isTerrafarmActive() bool {
 		return false
 	}
 
-	state, err := readTFState(stateFile)
+	tfState, err := terraform.ReadState(stateFile)
 
 	if err != nil {
 		return true
 	}
 
-	return len(state.Modules[0].Resources) != 0
+	return len(tfState.Modules[0].Resources) != 0
 }
 
 // getBuildNodesCount return number of nodes in given farm template
@@ -1316,20 +1290,20 @@ func readFarmState() (*FarmState, error) {
 }
 
 // collectNodesInfo collect base info about build nodes
-func collectNodesInfo(prefs *Preferences) ([]*NodeInfo, error) {
-	state, err := readTFState(getTerraformStateFilePath())
+func collectNodesInfo(p *prefs.Preferences) ([]*NodeInfo, error) {
+	tfState, err := terraform.ReadState(getTerraformStateFilePath())
 
 	if err != nil {
 		return nil, fmtc.Errorf("Can't read state file: %v", err)
 	}
 
-	if len(state.Modules) == 0 || len(state.Modules[0].Resources) == 0 {
+	if len(tfState.Modules) == 0 || len(tfState.Modules[0].Resources) == 0 {
 		return nil, nil
 	}
 
 	var result []*NodeInfo
 
-	for _, node := range state.Modules[0].Resources {
+	for _, node := range tfState.Modules[0].Resources {
 		if node.Info == nil || node.Info.Attributes == nil {
 			continue
 		}
@@ -1337,8 +1311,8 @@ func collectNodesInfo(prefs *Preferences) ([]*NodeInfo, error) {
 		node := &NodeInfo{
 			Name:     node.Info.Attributes.Name,
 			IP:       node.Info.Attributes.IP,
-			User:     prefs.User,
-			Password: prefs.Password,
+			User:     p.User,
+			Password: p.Password,
 			State:    STATE_UNKNOWN,
 		}
 
@@ -1359,8 +1333,8 @@ func collectNodesInfo(prefs *Preferences) ([]*NodeInfo, error) {
 }
 
 // printNodesInfo collect and print info about build nodes
-func printNodesInfo(prefs *Preferences) {
-	nodesInfo, err := collectNodesInfo(prefs)
+func printNodesInfo(p *prefs.Preferences) {
+	nodesInfo, err := collectNodesInfo(p)
 
 	if err != nil {
 		terminal.PrintErrorMessage("Can't collect nodes info: %v", err)
@@ -1376,20 +1350,20 @@ func printNodesInfo(prefs *Preferences) {
 }
 
 // exportNodeList exports info about nodes for usage in rpmbuilder
-func exportNodeList(prefs *Preferences) error {
-	if fsutil.IsExist(prefs.Output) {
-		if fsutil.IsDir(prefs.Output) {
+func exportNodeList(p *prefs.Preferences) error {
+	if fsutil.IsExist(p.Output) {
+		if fsutil.IsDir(p.Output) {
 			return fmtc.Errorf("Output path must be path to file")
 		}
 
-		if !fsutil.IsWritable(prefs.Output) {
+		if !fsutil.IsWritable(p.Output) {
 			return fmtc.Errorf("Output path must be path to writable file")
 		}
 
-		os.Remove(prefs.Output)
+		os.Remove(p.Output)
 	}
 
-	fd, err := os.OpenFile(prefs.Output, os.O_CREATE|os.O_WRONLY, 0644)
+	fd, err := os.OpenFile(p.Output, os.O_CREATE|os.O_WRONLY, 0644)
 
 	if err != nil {
 		return err
@@ -1397,7 +1371,7 @@ func exportNodeList(prefs *Preferences) error {
 
 	defer fd.Close()
 
-	nodesInfo, err := collectNodesInfo(prefs)
+	nodesInfo, err := collectNodesInfo(p)
 
 	if err != nil {
 		return err
@@ -1510,7 +1484,7 @@ func showAbout() {
 		Desc:    DESC,
 		Year:    2006,
 		Owner:   "ESSENTIAL KAOS",
-		License: "Essential Kaos Open Source License <https://essentialkaos.com/ekol?en>",
+		License: "Essential Kaos Open Source License <https://essentialkaos.com/ekol>",
 	}
 
 	about.Render()
