@@ -9,6 +9,7 @@ package cli
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -362,9 +363,7 @@ func createCommand(p *prefs.Preferences, args []string) {
 
 	addSignalInterception()
 
-	if arg.GetB(ARG_DEBUG) {
-		fmtc.Printf("{s-}EXEC → terraform apply %s{!}\n\n", strings.Join(vars, " "))
-	}
+	printDebug("EXEC → terraform apply %s", strings.Join(vars, " "))
 
 	// Current moment + 90 seconds for starting droplets
 	farmStartTime := time.Now().Unix() + 90
@@ -652,9 +651,7 @@ func destroyCommand(p *prefs.Preferences) {
 
 	addSignalInterception()
 
-	if arg.GetB(ARG_DEBUG) {
-		fmtc.Printf("{s-}EXEC → terraform destroy %s{!}\n\n", strings.Join(vars, " "))
-	}
+	printDebug("EXEC → terraform destroy %s", strings.Join(vars, " "))
 
 	fsutil.Push(path.Join(getDataDir(), p.Template))
 
@@ -1425,6 +1422,19 @@ func cleanTerraformGarbage() {
 	}
 }
 
+// printDebug print debug message if debug mode enabled
+func printDebug(message string, args ...interface{}) {
+	if !arg.GetB(ARG_DEBUG) {
+		return
+	}
+
+	if len(args) == 0 {
+		fmtc.Printf("{s-}%s{!}\n\n", message)
+	} else {
+		fmtc.Printf("{s-}%s{!}\n\n", fmt.Sprintf(message, args...))
+	}
+}
+
 // exit exit from app with given code
 func exit(code int) {
 	if !arg.GetB(ARG_DEBUG) {
@@ -1432,6 +1442,7 @@ func exit(code int) {
 	}
 
 	cleanTerraformGarbage()
+
 	os.Exit(code)
 }
 
