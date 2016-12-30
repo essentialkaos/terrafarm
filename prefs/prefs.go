@@ -13,11 +13,11 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"pkg.re/essentialkaos/ek.v5/arg"
-	"pkg.re/essentialkaos/ek.v5/env"
-	"pkg.re/essentialkaos/ek.v5/fsutil"
-	"pkg.re/essentialkaos/ek.v5/passwd"
-	"pkg.re/essentialkaos/ek.v5/timeutil"
+	"pkg.re/essentialkaos/ek.v6/arg"
+	"pkg.re/essentialkaos/ek.v6/env"
+	"pkg.re/essentialkaos/ek.v6/fsutil"
+	"pkg.re/essentialkaos/ek.v6/passwd"
+	"pkg.re/essentialkaos/ek.v6/timeutil"
 
 	"gopkg.in/hlandau/passlib.v1/hash/sha2crypt"
 
