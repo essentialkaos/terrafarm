@@ -22,7 +22,7 @@ resource "digitalocean_droplet" "terrafarm-c6-x32" {
       "echo 'Updating system packages...'",
       "yum -y -q update",
       "echo 'Installing KAOS repository package...'",
-      "yum -y -q install https://yum.kaos.io/6/release/i386/kaos-repo-7.0-0.el6.noarch.rpm",
+      "yum -y -q install https://yum.kaos.io/6/release/i386/kaos-repo-7.2-0.el6.noarch.rpm",
       "echo 'Installing EPEL repository package...'",
       "yum -y -q install epel-repo",
       "echo 'Updating packages...'",
