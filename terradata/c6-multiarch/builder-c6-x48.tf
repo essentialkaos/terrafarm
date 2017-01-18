@@ -24,7 +24,7 @@ resource "digitalocean_droplet" "builder-x48" {
       "echo 'Installing KAOS repository package...'",
       "yum -y -q install https://yum.kaos.io/6/release/i386/kaos-repo-7.2-0.el6.noarch.rpm",
       "echo 'Installing EPEL repository package...'",
-      "yum -y -q install epel-repo",
+      "yum -y -q install https://dl.fedoraproject.org/pub/epel/6/i386/epel-release-6-8.noarch.rpm",
       "echo 'Updating packages...'",
       "yum -y -q update",
       "echo 'Installing RPMBuilder Node package...'",

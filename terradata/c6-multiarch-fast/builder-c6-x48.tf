@@ -19,8 +19,6 @@ resource "digitalocean_droplet" "builder-x48" {
       "export PATH=$PATH:/usr/bin",
       "echo 'Installing KAOS repository package...'",
       "yum -y -q install http://release.yum.kaos.io/i386/kaos-repo-6.8-1.el6.noarch.rpm",
-      "echo 'Installing EPEL repository package...'",
-      "yum -y -q install epel-repo",
       "echo 'Installing RPMBuilder Node package...'",
       "yum -y -q install rpmbuilder-node",
       "echo 'Starting node configuration...'",
