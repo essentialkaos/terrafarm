@@ -142,6 +142,13 @@ type NodeInfo struct {
 	State    uint8
 }
 
+// DropletInfo contains basic node info
+type DropletInfo struct {
+	Price float64
+	CPU   int
+	Disk  int
+}
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 // NodeInfoSlice is slice with node info structs
@@ -184,22 +191,22 @@ var envMap = env.Get()
 // startTime is time when app is started
 var startTime = time.Now().Unix()
 
-// dropletPrices contains per-hour droplet prices
-var dropletPrices = map[string]float64{
-	"512mb":   0.007,
-	"1gb":     0.015,
-	"2gb":     0.030,
-	"4gb":     0.060,
-	"8gb":     0.119,
-	"16gb":    0.238,
-	"32gb":    0.426,
-	"48gb":    0.714,
-	"64gb":    0.952,
-	"m-16gb":  0.179,
-	"m-32gb":  0.357,
-	"m-64gb":  0.714,
-	"m-128gb": 1.429,
-	"m-224gb": 2.500,
+// dropletInfoStorage contains info about droplets
+var dropletInfoStorage = map[string]DropletInfo{
+	"512mb":   {0.007, 1, 20},
+	"1gb":     {0.015, 1, 30},
+	"2gb":     {0.030, 2, 40},
+	"4gb":     {0.060, 2, 60},
+	"8gb":     {0.119, 4, 80},
+	"16gb":    {0.238, 8, 160},
+	"32gb":    {0.426, 12, 320},
+	"48gb":    {0.714, 16, 480},
+	"64gb":    {0.952, 20, 640},
+	"m-16gb":  {0.179, 2, 30},
+	"m-32gb":  {0.357, 4, 90},
+	"m-64gb":  {0.714, 8, 200},
+	"m-128gb": {1.429, 16, 340},
+	"m-224gb": {2.500, 32, 500},
 }
 
 // temp is temp struct
@@ -518,14 +525,14 @@ func statusCommand(p *prefs.Preferences) {
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(p.Token))
 
-	printValidationMarker(tokenValid, disableValidation)
+	printValidationMarker(tokenValid, disableValidation, true)
 
 	fmtc.Printf("  {*}%-16s{!} %s\n", "Private Key:", p.Key)
 	fmtc.Printf("  {*}%-16s{!} %s\n", "Public Key:", p.Key+".pub")
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Fingerprint:", p.Fingerprint)
 
-	printValidationMarker(fingerprintValid, disableValidation)
+	printValidationMarker(fingerprintValid, disableValidation, true)
 
 	switch {
 	case p.TTL <= 0:
@@ -552,11 +559,21 @@ func statusCommand(p *prefs.Preferences) {
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Region:", p.Region)
 
-	printValidationMarker(regionValid, disableValidation)
+	printValidationMarker(regionValid, disableValidation, true)
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Node size:", p.NodeSize)
 
-	printValidationMarker(sizeValid, disableValidation)
+	printValidationMarker(sizeValid, disableValidation, false)
+
+	if dropletInfoStorage[p.NodeSize].CPU != 0 {
+		fmtc.Printf(
+			"{s-}(%s + %d GB disk){!}\n",
+			pluralize.Pluralize(dropletInfoStorage[p.NodeSize].CPU, "CPU", "CPUs"),
+			dropletInfoStorage[p.NodeSize].Disk,
+		)
+	} else {
+		fmtc.NewLine()
+	}
 
 	fmtc.Printf("  {*}%-16s{!} %s\n", "User:", p.User)
 
@@ -928,16 +945,20 @@ func saveState(p *prefs.Preferences, farmStartTime int64) {
 }
 
 // printValidationMarker print validation mark
-func printValidationMarker(value do.StatusCode, disableValidate bool) {
-	switch {
-	case disableValidate == true:
-		fmtc.Printf("\n")
-	case value == do.STATUS_OK:
-		fmtc.Printf(" {g}✔ {!}\n")
-	case value == do.STATUS_NOT_OK:
-		fmtc.Printf(" {r}✘ {!}\n")
-	case value == do.STATUS_ERROR:
-		fmtc.Printf(" {y*}? {!}\n")
+func printValidationMarker(value do.StatusCode, disableValidate, newLine bool) {
+	if !disableValidate {
+		switch {
+		case value == do.STATUS_OK:
+			fmtc.Printf(" {g}✔ {!}")
+		case value == do.STATUS_NOT_OK:
+			fmtc.Printf(" {r}✘ {!}")
+		case value == do.STATUS_ERROR:
+			fmtc.Printf(" {y*}? {!}")
+		}
+	}
+
+	if newLine {
+		fmtc.NewLine()
 	}
 }
 
@@ -1152,7 +1173,7 @@ func getUsagePriceMessage() (string, string) {
 	buildersTotal := getBuildNodesCount(farmState.Preferences.Template)
 	usageHours := time.Since(time.Unix(farmState.Started, 0)).Hours()
 	usageMinutes := int(time.Since(time.Unix(farmState.Started, 0)).Minutes())
-	currentUsagePrice := (usageHours * dropletPrices[farmState.Preferences.NodeSize]) * float64(buildersTotal)
+	currentUsagePrice := (usageHours * dropletInfoStorage[farmState.Preferences.NodeSize].Price) * float64(buildersTotal)
 	currentUsagePrice = mathutil.BetweenF(currentUsagePrice, 0.01, 1000000.0)
 
 	switch buildersTotal {
@@ -1167,12 +1188,12 @@ func getUsagePriceMessage() (string, string) {
 
 // calculateUsagePrice calculate usage price
 func calculateUsagePrice(time int64, nodeNum int, nodeSize string) float64 {
-	if dropletPrices[nodeSize] == 0.0 {
+	if dropletInfoStorage[nodeSize].Price == 0.0 {
 		return 0.0
 	}
 
 	hours := float64(time) / 60.0
-	price := (hours * dropletPrices[nodeSize]) * float64(nodeNum)
+	price := (hours * dropletInfoStorage[nodeSize].Price) * float64(nodeNum)
 	price = mathutil.BetweenF(price, 0.01, 1000000.0)
 
 	return price
