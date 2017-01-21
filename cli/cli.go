@@ -566,6 +566,10 @@ func statusCommand(p *prefs.Preferences) {
 	printValidationMarker(sizeValid, disableValidation, false)
 
 	if dropletInfoStorage[p.NodeSize].CPU != 0 {
+		if disableValidation {
+			fmt.Printf(" ")
+		}
+
 		fmtc.Printf(
 			"{s-}(%s + %d GB disk){!}\n",
 			pluralize.Pluralize(dropletInfoStorage[p.NodeSize].CPU, "CPU", "CPUs"),
