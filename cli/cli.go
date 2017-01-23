@@ -1478,9 +1478,10 @@ func signalInterceptor() {
 // given command name
 func getSpellcheckModel() *spellcheck.Model {
 	return spellcheck.Train([]string{
-		CMD_CREATE, CMD_APPLY, CMD_START,
-		CMD_DESTROY, CMD_DELETE, CMD_STOP,
-		CMD_STATUS, CMD_INFO, CMD_STATE,
+		CMD_APPLY, CMD_CREATE, CMD_DELETE, CMD_DESTROY,
+		CMD_DOCTOR, CMD_INFO, CMD_PROLONG, CMD_START,
+		CMD_STATE, CMD_STATUS, CMD_STOP, CMD_TEMPLATES,
+		CMD_RESOURCES,
 	})
 }
 
