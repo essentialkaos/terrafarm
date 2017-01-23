@@ -72,24 +72,26 @@ const (
 
 // List of supported commands
 const (
-	CMD_CREATE    = "create"
 	CMD_APPLY     = "apply"
-	CMD_START     = "start"
-	CMD_DESTROY   = "destroy"
+	CMD_CREATE    = "create"
 	CMD_DELETE    = "delete"
-	CMD_STOP      = "stop"
-	CMD_STATUS    = "status"
-	CMD_INFO      = "info"
-	CMD_STATE     = "state"
-	CMD_TEMPLATES = "templates"
-	CMD_PROLONG   = "prolong"
+	CMD_DESTROY   = "destroy"
 	CMD_DOCTOR    = "doctor"
+	CMD_INFO      = "info"
+	CMD_PROLONG   = "prolong"
+	CMD_START     = "start"
+	CMD_STATE     = "state"
+	CMD_STATUS    = "status"
+	CMD_STOP      = "stop"
+	CMD_TEMPLATES = "templates"
+	CMD_RESOURCES = "resources"
 
 	CMD_CREATE_SHORTCUT    = "c"
 	CMD_DESTROY_SHORTCUT   = "d"
+	CMD_PROLONG_SHORTCUT   = "p"
 	CMD_STATUS_SHORTCUT    = "s"
 	CMD_TEMPLATES_SHORTCUT = "t"
-	CMD_PROLONG_SHORTCUT   = "p"
+	CMD_RESOURCES_SHORTCUT = "r"
 )
 
 // List of build node states
@@ -144,9 +146,15 @@ type NodeInfo struct {
 
 // DropletInfo contains basic node info
 type DropletInfo struct {
-	Price float64
-	CPU   int
-	Disk  int
+	Price  float64
+	CPU    int
+	Memory float64
+	Disk   int
+}
+
+type RegionInfo struct {
+	DCName     string
+	RegionName string
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -191,22 +199,50 @@ var envMap = env.Get()
 // startTime is time when app is started
 var startTime = time.Now().Unix()
 
+// droplets contains droplets codes
+var droplets = []string{
+	"512mb", "1gb", "2gb", "4gb", "8gb", "16gb", "32gb", "64gb",
+	"m-16gb", "m-32gb", "m-64gb", "m-128gb", "m-224gb",
+}
+
 // dropletInfoStorage contains info about droplets
 var dropletInfoStorage = map[string]DropletInfo{
-	"512mb":   {0.007, 1, 20},
-	"1gb":     {0.015, 1, 30},
-	"2gb":     {0.030, 2, 40},
-	"4gb":     {0.060, 2, 60},
-	"8gb":     {0.119, 4, 80},
-	"16gb":    {0.238, 8, 160},
-	"32gb":    {0.426, 12, 320},
-	"48gb":    {0.714, 16, 480},
-	"64gb":    {0.952, 20, 640},
-	"m-16gb":  {0.179, 2, 30},
-	"m-32gb":  {0.357, 4, 90},
-	"m-64gb":  {0.714, 8, 200},
-	"m-128gb": {1.429, 16, 340},
-	"m-224gb": {2.500, 32, 500},
+	"512mb":   {0.007, 1, 0.512, 20},
+	"1gb":     {0.015, 1, 1, 30},
+	"2gb":     {0.030, 2, 2, 40},
+	"4gb":     {0.060, 2, 4, 60},
+	"8gb":     {0.119, 4, 8, 80},
+	"16gb":    {0.238, 8, 16, 160},
+	"32gb":    {0.426, 12, 32, 320},
+	"48gb":    {0.714, 16, 48, 480},
+	"64gb":    {0.952, 20, 64, 640},
+	"m-16gb":  {0.179, 2, 16, 30},
+	"m-32gb":  {0.357, 4, 32, 90},
+	"m-64gb":  {0.714, 8, 64, 200},
+	"m-128gb": {1.429, 16, 128, 340},
+	"m-224gb": {2.500, 32, 224, 500},
+}
+
+// regions contains regions codes
+var regions = []string{
+	"nyc1", "nyc2", "nyc3", "sfo1", "sfo2", "tor1",
+	"lon1", "ams2", "ams3", "fra1", "blr1", "sgp1",
+}
+
+// regionInfoStorage contains info about regions
+var regionInfoStorage = map[string]RegionInfo{
+	"nyc1": {"New York #1", "US East"},
+	"nyc2": {"New York #2", "US East"},
+	"nyc3": {"New York #3", "US East"},
+	"sfo1": {"San Francisco #1", "US West"},
+	"sfo2": {"San Francisco #2", "US West"},
+	"tor1": {"Toronto", "Canada"},
+	"lon1": {"London", "UK"},
+	"ams2": {"Amsterdam #2", "Europe"},
+	"ams3": {"Amsterdam #3", "Europe"},
+	"fra1": {"Frankfurt", "Europe"},
+	"blr1": {"Bangalore", "Asia Pacific"},
+	"sgp1": {"Singapore", "Asia Pacific"},
 }
 
 // temp is temp struct
@@ -324,6 +360,8 @@ func processCommand(cmd string, args []string) {
 		statusCommand(getPreferences())
 	case CMD_TEMPLATES, CMD_TEMPLATES_SHORTCUT:
 		templatesCommand()
+	case CMD_RESOURCES, CMD_RESOURCES_SHORTCUT:
+		resourcesCommand()
 	case CMD_PROLONG, CMD_PROLONG_SHORTCUT:
 		prolongCommand(args)
 	case CMD_DOCTOR:
@@ -571,7 +609,7 @@ func statusCommand(p *prefs.Preferences) {
 		}
 
 		fmtc.Printf(
-			"{s-}(%s + %d GB disk){!}\n",
+			"{s-}(%s + %d GB Disk){!}\n",
 			pluralize.Pluralize(dropletInfoStorage[p.NodeSize].CPU, "CPU", "CPUs"),
 			dropletInfoStorage[p.NodeSize].Disk,
 		)
@@ -721,6 +759,27 @@ func templatesCommand() {
 			"  %s {s-}(%s){!}\n", template,
 			pluralize.Pluralize(buildersCount, "build node", "build nodes"),
 		)
+	}
+
+	fmtutil.Separator(false)
+}
+
+// templatesCommand is resources command handler
+func resourcesCommand() {
+	fmtutil.Separator(false, "DROPLETS")
+
+	for _, d := range droplets {
+		di := dropletInfoStorage[d]
+		fmtc.Printf("  {c}%7s{!} $%g/hr {s-}(%s + %g GB Memory + %d GB Disk){!}\n", d,
+			di.Price, pluralize.Pluralize(di.CPU, "CPU", "CPUs"), di.Memory, di.Disk,
+		)
+	}
+
+	fmtutil.Separator(false, "REGIONS")
+
+	for _, r := range regions {
+		ri := regionInfoStorage[r]
+		fmtc.Printf("  {y}%s{!} %s {s-}(%s){!}\n", r, ri.DCName, ri.RegionName)
 	}
 
 	fmtutil.Separator(false)
@@ -1483,6 +1542,7 @@ func showUsage() {
 	info.AddCommand(CMD_DESTROY, "Destroy farm droplets on DigitalOcean")
 	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferences and status")
 	info.AddCommand(CMD_TEMPLATES, "List all available farm templates")
+	info.AddCommand(CMD_RESOURCES, "List available resources {s-}(droplets & regions){!}")
 	info.AddCommand(CMD_PROLONG, "Increase TTL or set max wait time", "ttl max-wait")
 	info.AddCommand(CMD_DOCTOR, "Fix problems with farm")
 
