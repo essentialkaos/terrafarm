@@ -1544,7 +1544,7 @@ func showUsage() {
 	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferences and status")
 	info.AddCommand(CMD_TEMPLATES, "List all available farm templates")
 	info.AddCommand(CMD_RESOURCES, "List available resources {s-}(droplets & regions){!}")
-	info.AddCommand(CMD_PROLONG, "Increase TTL or set max wait time", "ttl max-wait")
+	info.AddCommand(CMD_PROLONG, "Increase TTL or set max wait time", "ttl", "?max-wait")
 	info.AddCommand(CMD_DOCTOR, "Fix problems with farm")
 
 	info.AddOption(ARG_TTL, "Max farm TTL {s-}(Time To Live){!}", "time")
@@ -1576,12 +1576,13 @@ func showUsage() {
 // showAbout show info about utility
 func showAbout() {
 	about := &usage.About{
-		App:     APP,
-		Version: VER,
-		Desc:    DESC,
-		Year:    2006,
-		Owner:   "ESSENTIAL KAOS",
-		License: "Essential Kaos Open Source License <https://essentialkaos.com/ekol>",
+		App:        APP,
+		Version:    VER,
+		Desc:       DESC,
+		Year:       2006,
+		Owner:      "ESSENTIAL KAOS",
+		License:    "Essential Kaos Open Source License <https://essentialkaos.com/ekol>",
+		Repository: "essentialkaos/terrafarm",
 	}
 
 	about.Render()
