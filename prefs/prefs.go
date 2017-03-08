@@ -2,8 +2,8 @@ package prefs
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 //                                                                                    //
-//                     Copyright (c) 2009-2016 Essential Kaos                         //
-//      Essential Kaos Open Source License <http://essentialkaos.com/ekol?en>         //
+//                     Copyright (c) 2009-2017 ESSENTIAL KAOS                         //
+//        Essential Kaos Open Source License <https://essentialkaos.com/ekol>         //
 //                                                                                    //
 // ////////////////////////////////////////////////////////////////////////////////// //
 
@@ -13,11 +13,11 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"pkg.re/essentialkaos/ek.v6/arg"
-	"pkg.re/essentialkaos/ek.v6/env"
-	"pkg.re/essentialkaos/ek.v6/fsutil"
-	"pkg.re/essentialkaos/ek.v6/passwd"
-	"pkg.re/essentialkaos/ek.v6/timeutil"
+	"pkg.re/essentialkaos/ek.v7/arg"
+	"pkg.re/essentialkaos/ek.v7/env"
+	"pkg.re/essentialkaos/ek.v7/fsutil"
+	"pkg.re/essentialkaos/ek.v7/passwd"
+	"pkg.re/essentialkaos/ek.v7/timeutil"
 
 	"gopkg.in/hlandau/passlib.v1/hash/sha2crypt"
 

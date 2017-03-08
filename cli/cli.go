@@ -2,8 +2,8 @@ package cli
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 //                                                                                    //
-//                     Copyright (c) 2009-2016 Essential Kaos                         //
-//      Essential Kaos Open Source License <http://essentialkaos.com/ekol?en>         //
+//                     Copyright (c) 2009-2017 ESSENTIAL KAOS                         //
+//        Essential Kaos Open Source License <https://essentialkaos.com/ekol>         //
 //                                                                                    //
 // ////////////////////////////////////////////////////////////////////////////////// //
 
@@ -17,23 +17,24 @@ import (
 	"strings"
 	"time"
 
-	"pkg.re/essentialkaos/ek.v6/arg"
-	"pkg.re/essentialkaos/ek.v6/env"
-	"pkg.re/essentialkaos/ek.v6/fmtc"
-	"pkg.re/essentialkaos/ek.v6/fmtutil"
-	"pkg.re/essentialkaos/ek.v6/fsutil"
-	"pkg.re/essentialkaos/ek.v6/jsonutil"
-	"pkg.re/essentialkaos/ek.v6/log"
-	"pkg.re/essentialkaos/ek.v6/mathutil"
-	"pkg.re/essentialkaos/ek.v6/path"
-	"pkg.re/essentialkaos/ek.v6/pluralize"
-	"pkg.re/essentialkaos/ek.v6/req"
-	"pkg.re/essentialkaos/ek.v6/signal"
-	"pkg.re/essentialkaos/ek.v6/spellcheck"
-	"pkg.re/essentialkaos/ek.v6/terminal"
-	"pkg.re/essentialkaos/ek.v6/timeutil"
-	"pkg.re/essentialkaos/ek.v6/tmp"
-	"pkg.re/essentialkaos/ek.v6/usage"
+	"pkg.re/essentialkaos/ek.v7/arg"
+	"pkg.re/essentialkaos/ek.v7/env"
+	"pkg.re/essentialkaos/ek.v7/fmtc"
+	"pkg.re/essentialkaos/ek.v7/fmtutil"
+	"pkg.re/essentialkaos/ek.v7/fsutil"
+	"pkg.re/essentialkaos/ek.v7/jsonutil"
+	"pkg.re/essentialkaos/ek.v7/log"
+	"pkg.re/essentialkaos/ek.v7/mathutil"
+	"pkg.re/essentialkaos/ek.v7/path"
+	"pkg.re/essentialkaos/ek.v7/pluralize"
+	"pkg.re/essentialkaos/ek.v7/req"
+	"pkg.re/essentialkaos/ek.v7/signal"
+	"pkg.re/essentialkaos/ek.v7/spellcheck"
+	"pkg.re/essentialkaos/ek.v7/terminal"
+	"pkg.re/essentialkaos/ek.v7/timeutil"
+	"pkg.re/essentialkaos/ek.v7/tmp"
+	"pkg.re/essentialkaos/ek.v7/usage"
+	"pkg.re/essentialkaos/ek.v7/usage/update"
 
 	"github.com/essentialkaos/terrafarm/do"
 	"github.com/essentialkaos/terrafarm/prefs"
@@ -740,7 +741,7 @@ func destroyCommand(p *prefs.Preferences) {
 func templatesCommand() {
 	templates := fsutil.List(
 		getDataDir(), true,
-		&fsutil.ListingFilter{Perms: "DRX"},
+		fsutil.ListingFilter{Perms: "DRX"},
 	)
 
 	if len(templates) == 0 {
@@ -1293,7 +1294,7 @@ func getBuildNodesCount(template string) int {
 
 	builders := fsutil.List(
 		templateDir, true,
-		&fsutil.ListingFilter{
+		fsutil.ListingFilter{
 			MatchPatterns: []string{"builder*.tf"},
 		},
 	)
@@ -1490,7 +1491,7 @@ func getSpellcheckModel() *spellcheck.Model {
 func cleanTerraformGarbage() {
 	garbage := fsutil.List(
 		"/tmp", false,
-		&fsutil.ListingFilter{
+		fsutil.ListingFilter{
 			MatchPatterns: []string{"tf-plugin*", "plugin*"},
 			CTimeYounger:  startTime,
 		},
@@ -1535,8 +1536,6 @@ func exit(code int) {
 
 // showUsage show help content
 func showUsage() {
-	usage.Breadcrumbs = true
-
 	info := usage.NewInfo("")
 
 	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean", "template-name")
@@ -1576,13 +1575,13 @@ func showUsage() {
 // showAbout show info about utility
 func showAbout() {
 	about := &usage.About{
-		App:        APP,
-		Version:    VER,
-		Desc:       DESC,
-		Year:       2006,
-		Owner:      "ESSENTIAL KAOS",
-		License:    "Essential Kaos Open Source License <https://essentialkaos.com/ekol>",
-		Repository: "essentialkaos/terrafarm",
+		App:           APP,
+		Version:       VER,
+		Desc:          DESC,
+		Year:          2006,
+		Owner:         "ESSENTIAL KAOS",
+		License:       "Essential Kaos Open Source License <https://essentialkaos.com/ekol>",
+		UpdateChecker: usage.UpdateChecker{"essentialkaos/terrafarm", update.GitHubChecker},
 	}
 
 	about.Render()
