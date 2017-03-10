@@ -4,7 +4,7 @@
 <img width="200" height="200" src="https://gh.kaos.io/terrafarm.png"/>
 </p>
 
-`terrafarm` is utility for working with [Terraform](https://www.terraform.io)-based [rpmbuilder](https://github.com/essentialkaos/rpmbuilder) farm on [DigitalOcean](https://www.digitalocean.com).
+`terrafarm` is a utility for working with [Terraform](https://www.terraform.io)-based [rpmbuilder](https://github.com/essentialkaos/rpmbuilder) farm on [DigitalOcean](https://www.digitalocean.com).
 
 ## Usage demo
 
@@ -12,7 +12,7 @@
 
 ## Installation
 
-To build the terrafarm from scratch, make sure you have a working Go 1.5+ workspace ([instructions](https://golang.org/doc/install)) and latest version of [Terraform](https://www.terraform.io/downloads.html), then:
+To build the terrafarm from scratch, make sure you have a working Go 1.5+ workspace ([instructions](https://golang.org/doc/install)) and the latest version of [Terraform](https://www.terraform.io/downloads.html), then:
 
 ```
 go get github.com/essentialkaos/terrafarm
@@ -26,9 +26,9 @@ go get -u github.com/essentialkaos/terrafarm
 
 ## Configuration
 
-`terrafarm` have three ways for farm configuration — preferences file, environment variables and command-line arguments.
+`terrafarm` have three ways for farm configuration — preferences file, environment variables, and command-line arguments.
 
-You can use all three ways simultaneously, but in this case `terrafarm` uses different priority for each way:
+You can use all three ways simultaneously, but in this case, `terrafarm` uses different priority for each way:
 
 1. Preferences file (_lowest priority_)
 2. Environment variables
@@ -71,7 +71,7 @@ You can define or redefine properties using next variables:
 * `TERRAFARM_KEY` - Droplet size on DigitalOcean
 * `TERRAFARM_REGION` - DigitalOcean region
 * `TERRAFARM_NODE_SIZE` - Droplet size on DigitalOcean
-* `TERRAFARM_USER` - Build node user name
+* `TERRAFARM_USER` - Build node user login
 * `TERRAFARM_PASSWORD` - Build node user password
 
 Example:
@@ -88,11 +88,11 @@ All supported command-line arguments with usage examples can be found in [usage]
 
 ## Debugging
 
-If you find an bug with Terrafarm, please include the detailed log. As a user, this information can help work around the problem and prepare fixes. 
+If you find a bug with Terrafarm, please include the detailed log. As a user, this information can help work around the problem and prepare fixes. 
 
-First of all, you should specify `-D` or `--debug` argument with Terrafarm to print the output of command which would be executed. It might be useful to know what exactly parameters would be passed to Terraform.
+First of all, you should specify `-D` or `--debug` argument with Terrafarm to print output of the command which would be executed. It might be useful to know what exactly parameters would be passed to Terraform.
 
-Also keep in mind that Terrafarm works with Terraform and you should know how to debug it. We recommend to use `DEBUG` or `TRACE` values to find possible problems with Terraform. This will cause detailed logs to appear on stderr. To persist logged output you can set `TF_LOG_PATH` to write the log to a specific file.
+Also, keep in mind that Terrafarm works with Terraform and you should know how to debug it. We recommend using `DEBUG` or `TRACE` values to find possible problems with Terraform. This will cause detailed logs to appear on stderr. To persist logged output you can set `TF_LOG_PATH` to write the log to a specific file.
 
 ## Usage
 
@@ -117,7 +117,7 @@ Options
   --key, -K key-file         Path to private key
   --region, -R region        DigitalOcean region
   --node-size, -N size       Droplet size on DigitalOcean
-  --user, -U username        Build node user name
+  --user, -U username        Build node user login
   --password, -P password    Build node user password
   --force, -f                Force command execution
   --no-validate, -nv         Don't validate preferences
