@@ -401,7 +401,7 @@ func createCommand(p *prefs.Preferences, args []string) {
 		fmtutil.Separator(false)
 	}
 
-	vars, err := prefsToArgs(p, path.Join(getDataDir(), p.Template))
+	vars, err := prefsToArgs(p)
 
 	if err != nil {
 		terminal.PrintErrorMessage("Can't parse preferences: %v", err)
@@ -415,7 +415,11 @@ func createCommand(p *prefs.Preferences, args []string) {
 	// Current moment + 90 seconds for starting droplets
 	farmStartTime := time.Now().Unix() + 90
 
+	fsutil.Push(path.Join(getDataDir(), p.Template))
+
 	err = execTerraform(false, "apply", vars)
+
+	fsutil.Pop()
 
 	if err != nil {
 		terminal.PrintErrorMessage("\nError while executing terraform: %v", err)
@@ -706,7 +710,7 @@ func destroyCommand(p *prefs.Preferences) {
 	prefs.Token = p.Token
 	prefs.Password = p.Password
 
-	vars, err := prefsToArgs(prefs, "-force", path.Join(getDataDir(), prefs.Template))
+	vars, err := prefsToArgs(prefs, "-force")
 
 	if err != nil {
 		terminal.PrintErrorMessage("Can't parse prefs: %v", err)
@@ -721,7 +725,11 @@ func destroyCommand(p *prefs.Preferences) {
 
 	printDebug("EXEC → terraform destroy %s", strings.Join(vars, " "))
 
+	fsutil.Push(path.Join(getDataDir(), prefs.Template))
+
 	err = execTerraform(false, "destroy", vars)
+
+	fsutil.Pop()
 
 	if err != nil {
 		terminal.PrintErrorMessage("\nError while executing terraform: %v", err)
