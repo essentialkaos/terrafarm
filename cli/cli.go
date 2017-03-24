@@ -384,9 +384,9 @@ func createCommand(p *prefs.Preferences, args []string) {
 
 	if len(args) != 0 {
 		p.Template = args[0]
-		validatePreferences(p)
 	}
 
+	validatePreferences(p)
 	statusCommand(p)
 
 	if !arg.GetB(ARG_FORCE) {
@@ -1191,7 +1191,7 @@ func getPreferences() *prefs.Preferences {
 }
 
 func validatePreferences(p *prefs.Preferences) {
-	errs := p.Validate(getDataDir())
+	errs := p.Validate(getDataDir(), false)
 
 	if len(errs) != 0 {
 		for _, err := range errs {
@@ -1538,7 +1538,7 @@ func exit(code int) {
 func showUsage() {
 	info := usage.NewInfo("")
 
-	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean", "template-name")
+	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean", "?template-name")
 	info.AddCommand(CMD_DESTROY, "Destroy farm droplets on DigitalOcean")
 	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferences and status")
 	info.AddCommand(CMD_TEMPLATES, "List all available farm templates")

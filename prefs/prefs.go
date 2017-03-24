@@ -90,13 +90,13 @@ type Preferences struct {
 func FindAndReadPreferences(dataDir string) (*Preferences, []error) {
 	var err error
 
+	// Create preferences width default values
 	prefs := &Preferences{
 		TTL:      240,
 		Region:   "fra1",
 		NodeSize: "16gb",
 		User:     "builder",
 		Password: passwd.GenPassword(18, passwd.STRENGTH_MEDIUM),
-		Template: "c6-multiarch",
 	}
 
 	prefsFile := fsutil.ProperPath("FRS", []string{
@@ -130,7 +130,7 @@ func FindAndReadPreferences(dataDir string) (*Preferences, []error) {
 		prefs.Fingerprint = fingerprint
 	}
 
-	errs := prefs.Validate(dataDir)
+	errs := prefs.Validate(dataDir, true)
 
 	if len(errs) != 0 {
 		return nil, errs
@@ -331,7 +331,7 @@ func getFingerprint(key string) (string, error) {
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
-func (p *Preferences) Validate(dataDir string) []error {
+func (p *Preferences) Validate(dataDir string, allowEmptyTemplate bool) []error {
 	var errs []error
 
 	if p.Token == "" {
@@ -382,21 +382,25 @@ func (p *Preferences) Validate(dataDir string) []error {
 		}
 	}
 
-	templateDir := dataDir + "/" + p.Template
-
-	if !fsutil.IsExist(templateDir) {
-		errs = append(errs, fmt.Errorf("Directory with template %s is not exist", p.Template))
+	if p.Template == "" && !allowEmptyTemplate {
+		errs = append(errs, fmt.Errorf("You must define template name"))
 	} else {
-		if !fsutil.IsReadable(templateDir) {
-			errs = append(errs, fmt.Errorf("Directory with template %s is not readable", p.Template))
-		}
+		templateDir := dataDir + "/" + p.Template
 
-		if fsutil.IsDir(templateDir) {
-			if fsutil.IsEmptyDir(templateDir) {
-				errs = append(errs, fmt.Errorf("Directory with template %s is empty", p.Template))
-			}
+		if !fsutil.IsExist(templateDir) {
+			errs = append(errs, fmt.Errorf("Directory with template %s is not exist", p.Template))
 		} else {
-			errs = append(errs, fmt.Errorf("Target %s is not a directory", templateDir))
+			if !fsutil.IsReadable(templateDir) {
+				errs = append(errs, fmt.Errorf("Directory with template %s is not readable", p.Template))
+			}
+
+			if fsutil.IsDir(templateDir) {
+				if fsutil.IsEmptyDir(templateDir) {
+					errs = append(errs, fmt.Errorf("Directory with template %s is empty", p.Template))
+				}
+			} else {
+				errs = append(errs, fmt.Errorf("Target %s is not a directory", templateDir))
+			}
 		}
 	}
 
