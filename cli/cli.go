@@ -9,6 +9,7 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -400,7 +401,7 @@ func createCommand(p *prefs.Preferences, args []string) {
 		fmtutil.Separator(false)
 	}
 
-	vars, err := prefsToArgs(p)
+	vars, err := prefsToArgs(p, path.Join(getDataDir(), p.Template))
 
 	if err != nil {
 		terminal.PrintErrorMessage("Can't parse preferences: %v", err)
@@ -414,16 +415,12 @@ func createCommand(p *prefs.Preferences, args []string) {
 	// Current moment + 90 seconds for starting droplets
 	farmStartTime := time.Now().Unix() + 90
 
-	fsutil.Push(path.Join(getDataDir(), p.Template))
-
 	err = execTerraform(false, "apply", vars)
 
 	if err != nil {
 		terminal.PrintErrorMessage("\nError while executing terraform: %v", err)
 		exit(1)
 	}
-
-	fsutil.Pop()
 
 	fmtutil.Separator(false)
 
@@ -698,22 +695,31 @@ func destroyCommand(p *prefs.Preferences) {
 		}
 	}
 
-	fmtutil.Separator(false)
+	farmState, err := readFarmState()
 
-	priceMessage, priceMessageComment := getUsagePriceMessage()
+	if err != nil {
+		terminal.PrintErrorMessage("Can't read farm state: %v", err)
+		exit(1)
+	}
 
-	vars, err := prefsToArgs(p, "-force")
+	prefs := farmState.Preferences
+	prefs.Token = p.Token
+	prefs.Password = p.Password
+
+	vars, err := prefsToArgs(prefs, "-force", path.Join(getDataDir(), prefs.Template))
 
 	if err != nil {
 		terminal.PrintErrorMessage("Can't parse prefs: %v", err)
 		exit(1)
 	}
 
+	priceMessage, priceMessageComment := getUsagePriceMessage()
+
+	fmtutil.Separator(false)
+
 	addSignalInterception()
 
 	printDebug("EXEC → terraform destroy %s", strings.Join(vars, " "))
-
-	fsutil.Push(path.Join(getDataDir(), p.Template))
 
 	err = execTerraform(false, "destroy", vars)
 
@@ -721,8 +727,6 @@ func destroyCommand(p *prefs.Preferences) {
 		terminal.PrintErrorMessage("\nError while executing terraform: %v", err)
 		exit(1)
 	}
-
-	fsutil.Pop()
 
 	fmtutil.Separator(false)
 
@@ -1120,14 +1124,18 @@ func execTerraform(logOutput bool, command string, args []string) error {
 		cmd.Args = append(cmd.Args, strings.Split(strings.Join(args, " "), " ")...)
 	}
 
-	reader, err := cmd.StdoutPipe()
+	stdoutReader, err := cmd.StdoutPipe()
 
 	if err != nil {
 		return fmtc.Errorf("Can't redirect output: %v", err)
 	}
 
+	var stderrBuffer bytes.Buffer
+
+	cmd.Stderr = &stderrBuffer
+
 	statusLines := false
-	scanner := bufio.NewScanner(reader)
+	scanner := bufio.NewScanner(stdoutReader)
 
 	go func() {
 		for scanner.Scan() {
@@ -1169,7 +1177,7 @@ func execTerraform(logOutput bool, command string, args []string) error {
 	err = cmd.Wait()
 
 	if err != nil {
-		return fmtc.Errorf("Can't process terraform output: %v", err)
+		return fmtc.Errorf(stderrBuffer.String())
 	}
 
 	return nil
