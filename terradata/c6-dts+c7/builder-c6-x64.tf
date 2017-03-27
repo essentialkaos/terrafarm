@@ -1,4 +1,4 @@
-resource "digitalocean_droplet" "terrafarm-c6-x64" {
+resource "digitalocean_droplet" "builder-c6-x64" {
   image = "centos-6-5-x64"
   name = "terrafarm-c6-x64"
   region = "${var.region}"
@@ -42,7 +42,7 @@ resource "digitalocean_droplet" "terrafarm-c6-x64" {
   }
 
   provisioner "file" {
-    source = "conf/rpmmacros"
+    source = "conf/c6-rpmmacros"
     destination = "/home/builder/.rpmmacros"
   }
 
