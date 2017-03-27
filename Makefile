@@ -17,10 +17,10 @@ terrafarm:
 deps:
 	git config --global http.https://gopkg.in.followRedirects true
 	git config --global http.https://pkg.re.followRedirects true
-	go get -v github.com/yosida95/golang-sshkey
-	go get -v golang.org/x/crypto
-	go get -v gopkg.in/hlandau/passlib.v1
-	go get -v pkg.re/essentialkaos/ek.v7
+	go get -v -d github.com/yosida95/golang-sshkey
+	go get -v -d golang.org/x/crypto
+	go get -v -d gopkg.in/hlandau/passlib.v1
+	go get -v -d pkg.re/essentialkaos/ek.v7
 
 fmt:
 	find . -name "*.go" -exec gofmt -s -w {} \;
