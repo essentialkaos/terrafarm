@@ -20,6 +20,7 @@ deps:
 	go get -d -v github.com/yosida95/golang-sshkey
 	go get -d -v gopkg.in/hlandau/passlib.v1
 	go get -d -v pkg.re/essentialkaos/ek.v7
+	go get -d -v pkg.re/essentialkaos/go-linenoise.v3
 
 fmt:
 	find . -name "*.go" -exec gofmt -s -w {} \;
