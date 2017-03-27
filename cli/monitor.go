@@ -149,15 +149,27 @@ func runMonitoringLoop(destroyAfter time.Time, maxWait int64) {
 func destroyFarmByMonitor() bool {
 	log.Info("Starting farm destroying...")
 
+	farmState, err := readFarmState()
+
+	if err != nil {
+		log.Error("Can't read farm state: %v", err)
+		return false
+	}
+
 	prefs := getPreferences()
-	vars, err := prefsToArgs(prefs, "-no-color", "-force")
+
+	p := farmState.Preferences
+	p.Token = prefs.Token
+	p.Password = prefs.Password
+
+	vars, err := prefsToArgs(p, "-no-color", "-force")
 
 	if err != nil {
 		log.Error(err.Error())
 		return false
 	}
 
-	templateDir := path.Join(getDataDir(), prefs.Template)
+	templateDir := path.Join(getDataDir(), p.Template)
 
 	fsutil.Push(templateDir)
 

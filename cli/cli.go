@@ -666,13 +666,13 @@ func statusCommand(p *prefs.Preferences) {
 }
 
 // destroyCommand is destroy command handler
-func destroyCommand(p *prefs.Preferences) {
+func destroyCommand(prefs *prefs.Preferences) {
 	if !isTerrafarmActive() {
 		terminal.PrintWarnMessage("Terrafarm does not works, nothing to destroy")
 		exit(1)
 	}
 
-	activeBuildNodesCount := getActiveBuildNodesCount(p)
+	activeBuildNodesCount := getActiveBuildNodesCount(prefs)
 
 	if !arg.GetB(ARG_FORCE) {
 		fmtc.NewLine()
@@ -706,11 +706,11 @@ func destroyCommand(p *prefs.Preferences) {
 		exit(1)
 	}
 
-	prefs := farmState.Preferences
-	prefs.Token = p.Token
-	prefs.Password = p.Password
+	p := farmState.Preferences
+	p.Token = prefs.Token
+	p.Password = prefs.Password
 
-	vars, err := prefsToArgs(prefs, "-force")
+	vars, err := prefsToArgs(p, "-force")
 
 	if err != nil {
 		terminal.PrintErrorMessage("Can't parse prefs: %v", err)
@@ -725,7 +725,7 @@ func destroyCommand(p *prefs.Preferences) {
 
 	printDebug("EXEC → terraform destroy %s", strings.Join(vars, " "))
 
-	fsutil.Push(path.Join(getDataDir(), prefs.Template))
+	fsutil.Push(path.Join(getDataDir(), p.Template))
 
 	err = execTerraform(false, "destroy", vars)
 
