@@ -12,6 +12,12 @@
 
 ## Installation
 
+Before the initial install allows git to use redirects for [pkg.re](https://github.com/essentialkaos/pkgre) service (reason why you should do this described [here](https://github.com/essentialkaos/pkgre#git-support)):
+
+```
+git config --global http.https://pkg.re.followRedirects true
+```
+
 To build the terrafarm from scratch, make sure you have a working Go 1.5+ workspace ([instructions](https://golang.org/doc/install)) and the latest version of [Terraform](https://www.terraform.io/downloads.html), then:
 
 ```
