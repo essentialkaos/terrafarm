@@ -552,16 +552,21 @@ func statusCommand(p *prefs.Preferences) {
 	if !disableValidation {
 		tokenValid = do.IsValidToken(p.Token)
 		fingerprintValid = do.IsFingerprintValid(p.Token, p.Fingerprint)
-		regionValid = do.IsRegionValid(p.Token, p.Region)
-		sizeValid = do.IsSizeValid(p.Token, p.NodeSize)
+
+		if p.Template != "" {
+			regionValid = do.IsRegionValid(p.Token, p.Region)
+			sizeValid = do.IsSizeValid(p.Token, p.NodeSize)
+		}
 	}
 
 	fmtutil.Separator(false, "TERRAFARM")
 
-	fmtc.Printf(
-		"  {*}%-16s{!} %s {s-}(%s){!}\n", "Template:", p.Template,
-		pluralize.Pluralize(buildersTotal, "build node", "build nodes"),
-	)
+	if p.Template != "" {
+		fmtc.Printf(
+			"  {*}%-16s{!} %s {s-}(%s){!}\n", "Template:", p.Template,
+			pluralize.Pluralize(buildersTotal, "build node", "build nodes"),
+		)
+	}
 
 	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(p.Token))
 
@@ -574,52 +579,54 @@ func statusCommand(p *prefs.Preferences) {
 
 	printValidationMarker(fingerprintValid, disableValidation, true)
 
-	switch {
-	case p.TTL <= 0:
-		fmtc.Printf("  {*}%-16s{!} {r}disabled{!}", "TTL:")
-	case p.TTL > 360:
-		fmtc.Printf("  {*}%-16s{!} {r}%s{!}", "TTL:", timeutil.PrettyDuration(p.TTL*60))
-	case p.TTL > 120:
-		fmtc.Printf("  {*}%-16s{!} {y}%s{!}", "TTL:", timeutil.PrettyDuration(p.TTL*60))
-	default:
-		fmtc.Printf("  {*}%-16s{!} {g}%s{!}", "TTL:", timeutil.PrettyDuration(p.TTL*60))
-	}
-
-	if p.MaxWait > 0 {
-		fmtc.Printf("{s-} + %s wait{!}", pluralize.Pluralize(int(p.MaxWait), "minute", "minutes"))
-	}
-
-	if p.TTL <= 0 || totalUsagePriceMin <= 0 {
-		fmtc.NewLine()
-	} else if totalUsagePriceMin > 0 && totalUsagePriceMax > 0 {
-		fmtc.Printf(" {s-}(~ $%.2f - $%.2f){!}\n", totalUsagePriceMin, totalUsagePriceMax)
-	} else {
-		fmtc.Printf(" {s-}(~ $%.2f){!}\n", totalUsagePriceMin)
-	}
-
-	fmtc.Printf("  {*}%-16s{!} %s", "Region:", p.Region)
-
-	printValidationMarker(regionValid, disableValidation, true)
-
-	fmtc.Printf("  {*}%-16s{!} %s", "Node size:", p.NodeSize)
-
-	printValidationMarker(sizeValid, disableValidation, false)
-
-	if dropletInfoStorage[p.NodeSize].CPU != 0 {
-		if disableValidation {
-			fmt.Printf(" ")
+	if p.Template != "" {
+		switch {
+		case p.TTL <= 0:
+			fmtc.Printf("  {*}%-16s{!} {r}disabled{!}", "TTL:")
+		case p.TTL > 360:
+			fmtc.Printf("  {*}%-16s{!} {r}%s{!}", "TTL:", timeutil.PrettyDuration(p.TTL*60))
+		case p.TTL > 120:
+			fmtc.Printf("  {*}%-16s{!} {y}%s{!}", "TTL:", timeutil.PrettyDuration(p.TTL*60))
+		default:
+			fmtc.Printf("  {*}%-16s{!} {g}%s{!}", "TTL:", timeutil.PrettyDuration(p.TTL*60))
 		}
 
-		fmtc.Printf(
-			"{s-}(%s + %d GB Disk){!}\n",
-			pluralize.Pluralize(dropletInfoStorage[p.NodeSize].CPU, "CPU", "CPUs"),
-			dropletInfoStorage[p.NodeSize].Disk,
-		)
-	} else {
-		fmtc.NewLine()
-	}
+		if p.MaxWait > 0 {
+			fmtc.Printf("{s-} + %s wait{!}", pluralize.Pluralize(int(p.MaxWait), "minute", "minutes"))
+		}
 
-	fmtc.Printf("  {*}%-16s{!} %s\n", "User:", p.User)
+		if p.TTL <= 0 || totalUsagePriceMin <= 0 {
+			fmtc.NewLine()
+		} else if totalUsagePriceMin > 0 && totalUsagePriceMax > 0 {
+			fmtc.Printf(" {s-}(~ $%.2f - $%.2f){!}\n", totalUsagePriceMin, totalUsagePriceMax)
+		} else {
+			fmtc.Printf(" {s-}(~ $%.2f){!}\n", totalUsagePriceMin)
+		}
+
+		fmtc.Printf("  {*}%-16s{!} %s", "Region:", p.Region)
+
+		printValidationMarker(regionValid, disableValidation, true)
+
+		fmtc.Printf("  {*}%-16s{!} %s", "Node size:", p.NodeSize)
+
+		printValidationMarker(sizeValid, disableValidation, false)
+
+		if dropletInfoStorage[p.NodeSize].CPU != 0 {
+			if disableValidation {
+				fmt.Printf(" ")
+			}
+
+			fmtc.Printf(
+				"{s-}(%s + %d GB Disk){!}\n",
+				pluralize.Pluralize(dropletInfoStorage[p.NodeSize].CPU, "CPU", "CPUs"),
+				dropletInfoStorage[p.NodeSize].Disk,
+			)
+		} else {
+			fmtc.NewLine()
+		}
+
+		fmtc.Printf("  {*}%-16s{!} %s\n", "User:", p.User)
+	}
 
 	if p.Output != "" {
 		fmtc.Printf("  {*}%-16s{!} %s\n", "Output:", p.Output)
