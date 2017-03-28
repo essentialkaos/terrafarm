@@ -568,7 +568,7 @@ func statusCommand(p *prefs.Preferences) {
 		)
 	}
 
-	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(p.Token))
+	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getPrettyToken(p.Token))
 
 	printValidationMarker(tokenValid, disableValidation, true)
 
@@ -1017,7 +1017,7 @@ func saveState(p *prefs.Preferences, farmStartTime int64) {
 		Started:     farmStartTime,
 	}
 
-	farmState.Preferences.Token = getCryptedToken(p.Token)
+	farmState.Preferences.Token = getMaskedToken(p.Token)
 	farmState.Preferences.Password = ""
 
 	err := saveFarmState(farmState)
@@ -1055,8 +1055,8 @@ func printErrorStatusMarker(err error) {
 	}
 }
 
-// getMaskedToken return first and last 8 symbols of token
-func getMaskedToken(token string) string {
+// getPrettyToken return first and last 8 symbols of token
+func getPrettyToken(token string) string {
 	if len(token) != 64 {
 		return ""
 	}
@@ -1064,8 +1064,8 @@ func getMaskedToken(token string) string {
 	return token[:8] + "..." + token[56:]
 }
 
-// getCryptedToken return token with masked part
-func getCryptedToken(token string) string {
+// getMaskedToken return token with masked part
+func getMaskedToken(token string) string {
 	if len(token) != 64 {
 		return ""
 	}
