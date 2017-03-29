@@ -29,7 +29,6 @@ import (
 	"pkg.re/essentialkaos/ek.v7/path"
 	"pkg.re/essentialkaos/ek.v7/pluralize"
 	"pkg.re/essentialkaos/ek.v7/req"
-	"pkg.re/essentialkaos/ek.v7/signal"
 	"pkg.re/essentialkaos/ek.v7/spellcheck"
 	"pkg.re/essentialkaos/ek.v7/terminal"
 	"pkg.re/essentialkaos/ek.v7/timeutil"
@@ -247,6 +246,12 @@ var regionInfoStorage = map[string]RegionInfo{
 	"sgp1": {"Singapore", "Asia Pacific"},
 }
 
+// colorTags contains fmtc color codes
+var colorTags = []string{
+	"{c}", "{m}", "{b}", "{y}", "{g}",
+	"{c*}", "{m*}", "{b*}", "{y*}", "{g*}",
+}
+
 // temp is temp struct
 var temp *tmp.Temp
 
@@ -407,8 +412,6 @@ func createCommand(p *prefs.Preferences, args []string) {
 		terminal.PrintErrorMessage("Can't parse preferences: %v", err)
 		exit(1)
 	}
-
-	addSignalInterception()
 
 	printDebug("EXEC → terraform apply %s", strings.Join(vars, " "))
 
@@ -727,8 +730,6 @@ func destroyCommand(prefs *prefs.Preferences) {
 	priceMessage, priceMessageComment := getUsagePriceMessage()
 
 	fmtutil.Separator(false)
-
-	addSignalInterception()
 
 	printDebug("EXEC → terraform destroy %s", strings.Join(vars, " "))
 
@@ -1153,6 +1154,9 @@ func execTerraform(logOutput bool, command string, args []string) error {
 	scanner := bufio.NewScanner(stdoutReader)
 
 	go func() {
+		// map nodeName -> color
+		colorStore := make(map[string]string)
+
 		for scanner.Scan() {
 			text := scanner.Text()
 
@@ -1178,7 +1182,7 @@ func execTerraform(logOutput bool, command string, args []string) error {
 					}
 				}
 
-				fmtc.Printf("  %s\n", getColoredCommandOutput(text))
+				fmtc.Printf("  %s\n", getColoredCommandOutput(colorStore, text))
 			}
 		}
 	}()
@@ -1226,23 +1230,32 @@ func validatePreferences(p *prefs.Preferences) {
 }
 
 // getColoredCommandOutput return command output with colored remote-exec
-func getColoredCommandOutput(line string) string {
+func getColoredCommandOutput(colorStore map[string]string, line string) string {
+
 	// Remove garbage from line
 	line = strings.Replace(line, "\x1b[0m\x1b[0m", "", -1)
 
-	switch {
-	case strings.Contains(line, "-x32 (remote-exec)"):
-		return fmtc.Sprintf("{c}%s{!}", line)
-
-	case strings.Contains(line, "-x48 (remote-exec)"):
-		return fmtc.Sprintf("{b}%s{!}", line)
-
-	case strings.Contains(line, "-x64 (remote-exec)"):
-		return fmtc.Sprintf("{m}%s{!}", line)
-
-	default:
+	if !strings.Contains(line, "(remote-exec)") {
 		return line
 	}
+
+	nodeNameEnd := strings.Index(line, " ")
+
+	if nodeNameEnd == -1 {
+		return line
+	}
+
+	nodeName := line[:nodeNameEnd]
+	colorTag := colorStore[nodeName]
+
+	if colorTag == "" {
+		colorTag = colorTags[len(colorStore)]
+		colorStore[nodeName] = colorTag
+	}
+
+	line = strings.Replace(line, nodeName+" (remote-exec):", colorTag+nodeName+" (remote-exec):{!}", -1)
+
+	return fmtc.Sprintf(line)
 }
 
 // getUsagePriceMessage return message with usage price
@@ -1265,11 +1278,11 @@ func getUsagePriceMessage() (string, string) {
 
 	switch buildersTotal {
 	case 1:
-		return fmtc.Sprintf("$%.2f", currentUsagePrice),
-			fmtc.Sprintf("~%s × %d min", farmState.Preferences.NodeSize, usageMinutes)
+		return fmtc.Sprintf("~ $%.2f", currentUsagePrice),
+			fmtc.Sprintf("%s × %d min", farmState.Preferences.NodeSize, usageMinutes)
 	default:
-		return fmtc.Sprintf("$%.2f", currentUsagePrice),
-			fmtc.Sprintf("~%d × %s × %d min", buildersTotal, farmState.Preferences.NodeSize, usageMinutes)
+		return fmtc.Sprintf("~ $%.2f", currentUsagePrice),
+			fmtc.Sprintf("%d × %s × %d min", buildersTotal, farmState.Preferences.NodeSize, usageMinutes)
 	}
 }
 
@@ -1284,14 +1297,6 @@ func calculateUsagePrice(time int64, nodeNum int, nodeSize string) float64 {
 	price = mathutil.BetweenF(price, 0.01, 1000000.0)
 
 	return price
-}
-
-// addSignalInterception add interceptors for INT и TERM signals
-func addSignalInterception() {
-	signal.Handlers{
-		signal.INT:  signalInterceptor,
-		signal.TERM: signalInterceptor,
-	}.TrackAsync()
 }
 
 // isTerrafarmActive return true if terrafarm already active
@@ -1491,11 +1496,6 @@ func exportNodeList(p *prefs.Preferences) error {
 	}
 
 	return nil
-}
-
-// signalInterceptor is TERM and INT signal handler
-func signalInterceptor() {
-	terminal.PrintWarnMessage("\nYou can't cancel command execution in this time")
 }
 
 // getSpellcheckModel return spellcheck model for correcting
