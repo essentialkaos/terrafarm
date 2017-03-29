@@ -1266,10 +1266,10 @@ func getUsagePriceMessage() (string, string) {
 	switch buildersTotal {
 	case 1:
 		return fmtc.Sprintf("$%.2f", currentUsagePrice),
-			fmtc.Sprintf("%s × %d min", farmState.Preferences.NodeSize, usageMinutes)
+			fmtc.Sprintf("~%s × %d min", farmState.Preferences.NodeSize, usageMinutes)
 	default:
 		return fmtc.Sprintf("$%.2f", currentUsagePrice),
-			fmtc.Sprintf("%d × %s × %d min", buildersTotal, farmState.Preferences.NodeSize, usageMinutes)
+			fmtc.Sprintf("~%d × %s × %d min", buildersTotal, farmState.Preferences.NodeSize, usageMinutes)
 	}
 }
 
