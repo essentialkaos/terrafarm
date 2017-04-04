@@ -22,16 +22,12 @@ resource "digitalocean_droplet" "terrafarm-c6-x64" {
       "echo 'Updating system packages...'",
       "yum -y -q update",
       "echo 'Installing KAOS repository package...'",
-      "yum -y -q install https://yum.kaos.io/6/release/i386/kaos-repo-7.0-0.el6.noarch.rpm",
-      "echo 'Installing EPEL repository package...'",
-      "yum -y -q install epel-repo",
+      "yum -y -q install https://yum.kaos.io/6/release/x86_64/kaos-repo-7.2-0.el6.noarch.rpm",
       "echo 'Updating packages...'",
       "yum -y -q update",
       "echo 'Installing RPMBuilder Node package...'",
       "yum -y -q install rpmbuilder-node",
       "echo 'Starting node configuration...'",
-      "yum-config-manager --disable kaos-release &> /dev/null",
-      "yum-config-manager --enable kaos-release-x64 &> /dev/null",
       "sed -i 's#builder:!!#builder:${var.auth}#' /etc/shadow",
       "echo 'Build node configuration complete'"
     ]

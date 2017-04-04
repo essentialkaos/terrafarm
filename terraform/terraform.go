@@ -1,14 +1,14 @@
-package cli
+package terraform
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 //                                                                                    //
-//                     Copyright (c) 2009-2016 Essential Kaos                         //
-//      Essential Kaos Open Source License <http://essentialkaos.com/ekol?en>         //
+//                     Copyright (c) 2009-2017 ESSENTIAL KAOS                         //
+//        Essential Kaos Open Source License <https://essentialkaos.com/ekol>         //
 //                                                                                    //
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 import (
-	"pkg.re/essentialkaos/ek.v5/jsonutil"
+	"pkg.re/essentialkaos/ek.v7/jsonutil"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -40,7 +40,8 @@ type TFResourceAttributes struct {
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
-func readTFState(file string) (*TFState, error) {
+// ReadState read and parse terraform state file
+func ReadState(file string) (*TFState, error) {
 	state := &TFState{}
 
 	err := jsonutil.DecodeFile(file, state)

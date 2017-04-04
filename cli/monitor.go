@@ -2,8 +2,8 @@ package cli
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 //                                                                                    //
-//                     Copyright (c) 2009-2016 Essential Kaos                         //
-//      Essential Kaos Open Source License <http://essentialkaos.com/ekol?en>         //
+//                     Copyright (c) 2009-2017 ESSENTIAL KAOS                         //
+//        Essential Kaos Open Source License <https://essentialkaos.com/ekol>         //
 //                                                                                    //
 // ////////////////////////////////////////////////////////////////////////////////// //
 
@@ -14,14 +14,13 @@ import (
 	"strings"
 	"time"
 
-	"pkg.re/essentialkaos/ek.v5/arg"
-	"pkg.re/essentialkaos/ek.v5/fmtc"
-	"pkg.re/essentialkaos/ek.v5/fsutil"
-	"pkg.re/essentialkaos/ek.v5/jsonutil"
-	"pkg.re/essentialkaos/ek.v5/log"
-	"pkg.re/essentialkaos/ek.v5/path"
-	"pkg.re/essentialkaos/ek.v5/signal"
-	"pkg.re/essentialkaos/ek.v5/timeutil"
+	"pkg.re/essentialkaos/ek.v7/fmtc"
+	"pkg.re/essentialkaos/ek.v7/fsutil"
+	"pkg.re/essentialkaos/ek.v7/jsonutil"
+	"pkg.re/essentialkaos/ek.v7/log"
+	"pkg.re/essentialkaos/ek.v7/path"
+	"pkg.re/essentialkaos/ek.v7/signal"
+	"pkg.re/essentialkaos/ek.v7/timeutil"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -29,7 +28,6 @@ import (
 // MonitorState contains monitor specific info
 type MonitorState struct {
 	Pid          int   `json:"pid"`
-	Started      int64 `json:"started"`
 	DestroyAfter int64 `json:"destroy_after"`
 	MaxWait      int64 `json:"max_wait"`
 }
@@ -50,6 +48,8 @@ func startFarmMonitor() {
 		exit(1)
 	}
 
+	updateMonitorPid()
+
 	signal.Handlers{
 		signal.USR1: usr1SignalHandler,
 		signal.TERM: termSignalHandler,
@@ -67,42 +67,11 @@ func startFarmMonitor() {
 
 // getMonitorState return monitor state
 func getMonitorState() (*MonitorState, error) {
-	var (
-		state *MonitorState
-		err   error
-	)
-
-	if arg.GetS(ARG_MONITOR) == "-1" {
-		if !fsutil.IsExist(getMonitorStateFilePath()) {
-			return nil, fmtc.Errorf("Can't start monitoring process: state file not exist")
-		}
-
-		state, err = readMonitorState()
+	if !fsutil.IsExist(getMonitorStateFilePath()) {
+		return nil, fmtc.Errorf("Can't start monitoring process: state file not exist")
 	}
 
-	if state == nil {
-		destroyAfter, maxWait, ok := parseMonitoringPreferences(arg.GetS(ARG_MONITOR))
-
-		if !ok {
-			return nil, fmtc.Errorf("Can't parse given monitor preferences (%s)", arg.GetS(ARG_MONITOR))
-		}
-
-		state = &MonitorState{
-			Started:      time.Now().Unix(),
-			DestroyAfter: destroyAfter.Unix(),
-			MaxWait:      maxWait,
-		}
-	}
-
-	state.Pid = os.Getpid()
-
-	err = saveMonitorState(state)
-
-	if err != nil {
-		return nil, fmtc.Errorf("Can't save monitor state to file: %v", err)
-	}
-
-	return state, nil
+	return readMonitorState()
 }
 
 // killMonitorProcess kill monitor process
@@ -180,15 +149,27 @@ func runMonitoringLoop(destroyAfter time.Time, maxWait int64) {
 func destroyFarmByMonitor() bool {
 	log.Info("Starting farm destroying...")
 
-	prefs := findAndReadPreferences()
-	vars, err := prefsToArgs(prefs, "-no-color", "-force")
+	farmState, err := readFarmState()
+
+	if err != nil {
+		log.Error("Can't read farm state: %v", err)
+		return false
+	}
+
+	prefs := getPreferences()
+
+	p := farmState.Preferences
+	p.Token = prefs.Token
+	p.Password = prefs.Password
+
+	vars, err := prefsToArgs(p, "-no-color", "-force")
 
 	if err != nil {
 		log.Error(err.Error())
 		return false
 	}
 
-	templateDir := path.Join(getDataDir(), prefs.Template)
+	templateDir := path.Join(getDataDir(), p.Template)
 
 	fsutil.Push(templateDir)
 
@@ -265,7 +246,30 @@ func deleteMonitorStateFile() error {
 
 // saveMonitorState save monitor state to file
 func saveMonitorState(state *MonitorState) error {
-	return jsonutil.EncodeToFile(getMonitorStateFilePath(), state)
+	stateFile := getMonitorStateFilePath()
+
+	if fsutil.IsExist(stateFile) {
+		err := os.Remove(stateFile)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return jsonutil.EncodeToFile(stateFile, state)
+}
+
+// updateMonitorPid update
+func updateMonitorPid() error {
+	state, err := readMonitorState()
+
+	if err != nil {
+		return err
+	}
+
+	state.Pid = os.Getpid()
+
+	return saveMonitorState(state)
 }
 
 // readMonitorDestroyDate read monitor state from file
@@ -287,22 +291,8 @@ func readMonitorState() (*MonitorState, error) {
 }
 
 // startMonitorProcess start or restart monitoring process
-func startMonitorProcess(prefs *Preferences, restart bool) error {
-	monitorPrefs := "-1"
-
-	if !restart {
-		monitorPrefs = fmtc.Sprintf("%d", time.Now().Unix()+(prefs.TTL*60))
-
-		if prefs.MaxWait > 0 {
-			monitorPrefs += fmtc.Sprintf("+%d", prefs.MaxWait*60)
-		}
-	}
-
-	if arg.GetB(ARG_DEBUG) {
-		fmtc.Printf("\n{s-}EXEC → terrafarm --monitor %s{!}\n\n", monitorPrefs)
-	}
-
-	cmd := exec.Command("terrafarm", "--monitor", monitorPrefs)
+func startMonitorProcess(restart bool) error {
+	cmd := exec.Command("terrafarm", "--monitor")
 	err := cmd.Start()
 
 	if err != nil {
@@ -325,46 +315,11 @@ func startMonitorProcess(prefs *Preferences, restart bool) error {
 func isMonitorActive() bool {
 	state, err := readMonitorState()
 
-	if err != nil {
+	if err != nil || state.Pid == 0 {
 		return false
 	}
 
-	return fsutil.IsExist(path.Join("/proc", fmtc.Sprintf("%d", state.Pid)))
-}
-
-// parseMonitoringPreferences parse monitoring preferences
-func parseMonitoringPreferences(data string) (time.Time, int64, bool) {
-	var (
-		destroyAfter int64
-		maxWait      int64
-		err          error
-	)
-
-	if strings.Contains(data, "+") {
-		dataSlice := strings.Split(data, "+")
-
-		destroyAfter, err = strconv.ParseInt(dataSlice[0], 10, 64)
-
-		if err != nil {
-			return time.Time{}, 0, false
-		}
-
-		maxWait, err = strconv.ParseInt(dataSlice[1], 10, 64)
-
-		if err != nil {
-			return time.Time{}, 0, false
-		}
-
-		return time.Unix(destroyAfter, 0), maxWait, true
-	}
-
-	destroyAfter, err = strconv.ParseInt(data, 10, 64)
-
-	if err != nil {
-		return time.Time{}, 0, false
-	}
-
-	return time.Unix(destroyAfter, 0), 0, true
+	return fsutil.IsExist("/proc/" + strconv.Itoa(state.Pid))
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //

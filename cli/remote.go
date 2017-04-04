@@ -2,8 +2,8 @@ package cli
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 //                                                                                    //
-//                     Copyright (c) 2009-2016 Essential Kaos                         //
-//      Essential Kaos Open Source License <http://essentialkaos.com/ekol?en>         //
+//                     Copyright (c) 2009-2017 ESSENTIAL KAOS                         //
+//        Essential Kaos Open Source License <https://essentialkaos.com/ekol>         //
 //                                                                                    //
 // ////////////////////////////////////////////////////////////////////////////////// //
 
@@ -13,13 +13,15 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"github.com/essentialkaos/terrafarm/prefs"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 // getBuildNodesInfo return list of with info about build nodes
-func getBuildNodesInfo(prefs *Preferences) []*NodeInfo {
-	keyData, err := ioutil.ReadFile(prefs.Key)
+func getBuildNodesInfo(p *prefs.Preferences) []*NodeInfo {
+	keyData, err := ioutil.ReadFile(p.Key)
 
 	if err != nil {
 		fmt.Println(err.Error())
@@ -41,7 +43,7 @@ func getBuildNodesInfo(prefs *Preferences) []*NodeInfo {
 		Timeout: time.Second,
 	}
 
-	nodes, err := collectNodesInfo(prefs)
+	nodes, err := collectNodesInfo(p)
 
 	if err != nil {
 		fmt.Println(err.Error())
@@ -65,7 +67,7 @@ func getBuildNodesInfo(prefs *Preferences) []*NodeInfo {
 		}
 
 		_, err = session.Output(
-			fmt.Sprintf("stat -c '%%Y' /home/%s/.buildlock", prefs.User),
+			fmt.Sprintf("stat -c '%%Y' /home/%s/.buildlock", p.User),
 		)
 
 		if err == nil {
@@ -83,8 +85,8 @@ func getBuildNodesInfo(prefs *Preferences) []*NodeInfo {
 
 // getActiveBuildNodesCount return number of build nodes with active
 // build process
-func getActiveBuildNodesCount(prefs *Preferences) int {
-	nodes := getBuildNodesInfo(prefs)
+func getActiveBuildNodesCount(p *prefs.Preferences) int {
+	nodes := getBuildNodesInfo(p)
 
 	if len(nodes) == 0 {
 		return 0
@@ -103,8 +105,8 @@ func getActiveBuildNodesCount(prefs *Preferences) int {
 
 // getActiveBuildNodesNames return slice with names of build nodes
 // with active build process
-func getActiveBuildNodesNames(prefs *Preferences) []string {
-	nodes := getBuildNodesInfo(prefs)
+func getActiveBuildNodesNames(p *prefs.Preferences) []string {
+	nodes := getBuildNodesInfo(p)
 
 	if len(nodes) == 0 {
 		return []string{}

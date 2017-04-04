@@ -1,6 +1,6 @@
-resource "digitalocean_droplet" "builder-x48" {
-  image = "centos-6-5-x32"
-  name = "terrafarm-c6-x48"
+resource "digitalocean_droplet" "builder-c7-x64" {
+  image = "centos-7-0-x64"
+  name = "terrafarm-c7-x64"
   region = "${var.region}"
   size = "${var.node_size}"
   ssh_keys = [
@@ -17,15 +17,17 @@ resource "digitalocean_droplet" "builder-x48" {
   provisioner "remote-exec" {
     inline = [
       "export PATH=$PATH:/usr/bin",
+      "echo 'Cleaning yum cache...'",
+      "yum -y -q clean expire-cache",
+      "echo 'Updating system packages...'",
+      "yum -y -q update",
       "echo 'Installing KAOS repository package...'",
-      "yum -y -q install http://release.yum.kaos.io/i386/kaos-repo-6.8-1.el6.noarch.rpm",
-      "echo 'Installing EPEL repository package...'",
-      "yum -y -q install epel-repo",
+      "yum -y -q install https://yum.kaos.io/7/release/x86_64/kaos-repo-7.2-0.el7.noarch.rpm",
+      "echo 'Updating packages...'",
+      "yum -y -q update",
       "echo 'Installing RPMBuilder Node package...'",
       "yum -y -q install rpmbuilder-node",
       "echo 'Starting node configuration...'",
-      "yum-config-manager --disable kaos-release &> /dev/null",
-      "yum-config-manager --enable kaos-release-i686 &> /dev/null",
       "sed -i 's#builder:!!#builder:${var.auth}#' /etc/shadow",
       "echo 'Build node configuration complete'"
     ]
@@ -37,7 +39,7 @@ resource "digitalocean_droplet" "builder-x48" {
   }
 
   provisioner "file" {
-    source = "conf/rpmmacros"
+    source = "conf/c7-rpmmacros"
     destination = "/home/builder/.rpmmacros"
   }
 

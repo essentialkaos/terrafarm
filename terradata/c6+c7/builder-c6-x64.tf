@@ -1,6 +1,6 @@
-resource "digitalocean_droplet" "terrafarm-c6-x32" {
-  image = "centos-6-5-x32"
-  name = "terrafarm-c6-x32"
+resource "digitalocean_droplet" "builder-c6-x64" {
+  image = "centos-6-5-x64"
+  name = "terrafarm-c6-x64"
   region = "${var.region}"
   size = "${var.node_size}"
   ssh_keys = [
@@ -22,19 +22,12 @@ resource "digitalocean_droplet" "terrafarm-c6-x32" {
       "echo 'Updating system packages...'",
       "yum -y -q update",
       "echo 'Installing KAOS repository package...'",
-      "yum -y -q install https://yum.kaos.io/6/release/i386/kaos-repo-7.0-0.el6.noarch.rpm",
-      "echo 'Installing EPEL repository package...'",
-      "yum -y -q install epel-repo",
+      "yum -y -q install https://yum.kaos.io/6/release/x86_64/kaos-repo-7.2-0.el6.noarch.rpm",
       "echo 'Updating packages...'",
       "yum -y -q update",
-      "echo 'Installing DevToolSet repo...'",
-      "rpm --import https://linux.web.cern.ch/linux/scientific6/docs/repository/cern/slc6X/i386/RPM-GPG-KEY-cern",
-      "curl -o /etc/yum.repos.d/slc6-devtoolset.repo https://linux.web.cern.ch/linux/scientific6/docs/repository/cern/devtoolset/slc6-devtoolset.repo",
       "echo 'Installing RPMBuilder Node package...'",
       "yum -y -q install rpmbuilder-node",
       "echo 'Starting node configuration...'",
-      "yum-config-manager --disable kaos-release &> /dev/null",
-      "yum-config-manager --enable kaos-release-i386 &> /dev/null",
       "sed -i 's#builder:!!#builder:${var.auth}#' /etc/shadow",
       "echo 'Build node configuration complete'"
     ]
@@ -46,7 +39,7 @@ resource "digitalocean_droplet" "terrafarm-c6-x32" {
   }
 
   provisioner "file" {
-    source = "conf/rpmmacros"
+    source = "conf/c6-rpmmacros"
     destination = "/home/builder/.rpmmacros"
   }
 

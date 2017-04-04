@@ -2,15 +2,15 @@ package cli
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 //                                                                                    //
-//                     Copyright (c) 2009-2016 Essential Kaos                         //
-//      Essential Kaos Open Source License <http://essentialkaos.com/ekol?en>         //
+//                     Copyright (c) 2009-2017 ESSENTIAL KAOS                         //
+//        Essential Kaos Open Source License <https://essentialkaos.com/ekol>         //
 //                                                                                    //
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 import (
 	"bufio"
-	"crypto"
-	"io/ioutil"
+	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -18,27 +18,27 @@ import (
 	"strings"
 	"time"
 
-	"pkg.re/essentialkaos/ek.v5/arg"
-	"pkg.re/essentialkaos/ek.v5/env"
-	"pkg.re/essentialkaos/ek.v5/fmtc"
-	"pkg.re/essentialkaos/ek.v5/fmtutil"
-	"pkg.re/essentialkaos/ek.v5/fsutil"
-	"pkg.re/essentialkaos/ek.v5/jsonutil"
-	"pkg.re/essentialkaos/ek.v5/log"
-	"pkg.re/essentialkaos/ek.v5/mathutil"
-	"pkg.re/essentialkaos/ek.v5/path"
-	"pkg.re/essentialkaos/ek.v5/pluralize"
-	"pkg.re/essentialkaos/ek.v5/req"
-	"pkg.re/essentialkaos/ek.v5/signal"
-	"pkg.re/essentialkaos/ek.v5/spellcheck"
-	"pkg.re/essentialkaos/ek.v5/terminal"
-	"pkg.re/essentialkaos/ek.v5/timeutil"
-	"pkg.re/essentialkaos/ek.v5/tmp"
-	"pkg.re/essentialkaos/ek.v5/usage"
-
-	sshkey "github.com/yosida95/golang-sshkey"
+	"pkg.re/essentialkaos/ek.v7/arg"
+	"pkg.re/essentialkaos/ek.v7/env"
+	"pkg.re/essentialkaos/ek.v7/fmtc"
+	"pkg.re/essentialkaos/ek.v7/fmtutil"
+	"pkg.re/essentialkaos/ek.v7/fsutil"
+	"pkg.re/essentialkaos/ek.v7/jsonutil"
+	"pkg.re/essentialkaos/ek.v7/log"
+	"pkg.re/essentialkaos/ek.v7/mathutil"
+	"pkg.re/essentialkaos/ek.v7/path"
+	"pkg.re/essentialkaos/ek.v7/pluralize"
+	"pkg.re/essentialkaos/ek.v7/req"
+	"pkg.re/essentialkaos/ek.v7/spellcheck"
+	"pkg.re/essentialkaos/ek.v7/terminal"
+	"pkg.re/essentialkaos/ek.v7/timeutil"
+	"pkg.re/essentialkaos/ek.v7/tmp"
+	"pkg.re/essentialkaos/ek.v7/usage"
+	"pkg.re/essentialkaos/ek.v7/usage/update"
 
 	"github.com/essentialkaos/terrafarm/do"
+	"github.com/essentialkaos/terrafarm/prefs"
+	"github.com/essentialkaos/terrafarm/terraform"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -46,8 +46,8 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "0.10.8"
-	DESC = "Utility for working with terraform based rpmbuilder farm"
+	VER  = "1.0.0"
+	DESC = "Utility for working with terraform based RPMBuilder farm"
 )
 
 // List of supported command-line arguments
@@ -73,53 +73,26 @@ const (
 
 // List of supported commands
 const (
-	CMD_CREATE    = "create"
 	CMD_APPLY     = "apply"
-	CMD_START     = "start"
-	CMD_DESTROY   = "destroy"
+	CMD_CREATE    = "create"
 	CMD_DELETE    = "delete"
-	CMD_STOP      = "stop"
-	CMD_STATUS    = "status"
-	CMD_INFO      = "info"
-	CMD_STATE     = "state"
-	CMD_TEMPLATES = "templates"
-	CMD_PROLONG   = "prolong"
+	CMD_DESTROY   = "destroy"
 	CMD_DOCTOR    = "doctor"
+	CMD_INFO      = "info"
+	CMD_PROLONG   = "prolong"
+	CMD_START     = "start"
+	CMD_STATE     = "state"
+	CMD_STATUS    = "status"
+	CMD_STOP      = "stop"
+	CMD_TEMPLATES = "templates"
+	CMD_RESOURCES = "resources"
 
 	CMD_CREATE_SHORTCUT    = "c"
 	CMD_DESTROY_SHORTCUT   = "d"
+	CMD_PROLONG_SHORTCUT   = "p"
 	CMD_STATUS_SHORTCUT    = "s"
 	CMD_TEMPLATES_SHORTCUT = "t"
-	CMD_PROLONG_SHORTCUT   = "p"
-)
-
-// List of supported environment variables
-const (
-	EV_DATA      = "TERRAFARM_DATA"
-	EV_TTL       = "TERRAFARM_TTL"
-	EV_MAX_WAIT  = "TERRAFARM_MAX_WAIT"
-	EV_OUTPUT    = "TERRAFARM_OUTPUT"
-	EV_TEMPLATE  = "TERRAFARM_TEMPLATE"
-	EV_TOKEN     = "TERRAFARM_TOKEN"
-	EV_KEY       = "TERRAFARM_KEY"
-	EV_REGION    = "TERRAFARM_REGION"
-	EV_NODE_SIZE = "TERRAFARM_NODE_SIZE"
-	EV_USER      = "TERRAFARM_USER"
-	EV_PASSWORD  = "TERRAFARM_PASSWORD"
-)
-
-// List of supported preferences
-const (
-	PREFS_TTL       = "ttl"
-	PREFS_MAX_WAIT  = "max-wait"
-	PREFS_OUTPUT    = "output"
-	PREFS_TEMPLATE  = "template"
-	PREFS_TOKEN     = "token"
-	PREFS_KEY       = "key"
-	PREFS_REGION    = "region"
-	PREFS_NODE_SIZE = "node-size"
-	PREFS_USER      = "user"
-	PREFS_PASSWORD  = "password"
+	CMD_RESOURCES_SHORTCUT = "r"
 )
 
 // List of build node states
@@ -129,6 +102,9 @@ const (
 	STATE_ACTIVE
 	STATE_DOWN
 )
+
+// Environment variable with path to data
+const EV_DATA = "TERRAFARM_DATA"
 
 // TERRAFORM_DATA_DIR is name of directory with terraform data
 const TERRAFORM_DATA_DIR = "terradata"
@@ -155,8 +131,8 @@ const SEPARATOR = "-------------------------------------------------------------
 
 // FarmState contains farm specific info
 type FarmState struct {
-	Preferences *Preferences `json:"preferences"`
-	Fingerprint string       `json:"fingerprint"`
+	Preferences *prefs.Preferences `json:"preferences"`
+	Started     int64              `json:"started"`
 }
 
 // NodeInfo contains info about build node
@@ -167,6 +143,19 @@ type NodeInfo struct {
 	User     string
 	Password string
 	State    uint8
+}
+
+// DropletInfo contains basic node info
+type DropletInfo struct {
+	Price  float64
+	CPU    int
+	Memory float64
+	Disk   int
+}
+
+type RegionInfo struct {
+	DCName     string
+	RegionName string
 }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -191,7 +180,7 @@ var argMap = arg.Map{
 	ARG_USER:        {},
 	ARG_MAX_WAIT:    {},
 	ARG_DEBUG:       {Type: arg.BOOL},
-	ARG_MONITOR:     {},
+	ARG_MONITOR:     {Type: arg.BOOL},
 	ARG_FORCE:       {Type: arg.BOOL},
 	ARG_NO_VALIDATE: {Type: arg.BOOL},
 	ARG_NOTIFY:      {Type: arg.BOOL},
@@ -211,22 +200,56 @@ var envMap = env.Get()
 // startTime is time when app is started
 var startTime = time.Now().Unix()
 
-// dropletPrices contains per-hour droplet prices
-var dropletPrices = map[string]float64{
-	"512mb":   0.007,
-	"1gb":     0.015,
-	"2gb":     0.030,
-	"4gb":     0.060,
-	"8gb":     0.119,
-	"16gb":    0.238,
-	"32gb":    0.426,
-	"48gb":    0.714,
-	"64gb":    0.952,
-	"m-16gb":  0.179,
-	"m-32gb":  0.357,
-	"m-64gb":  0.714,
-	"m-128gb": 1.429,
-	"m-224gb": 2.500,
+// droplets contains droplets codes
+var droplets = []string{
+	"512mb", "1gb", "2gb", "4gb", "8gb", "16gb", "32gb", "64gb",
+	"m-16gb", "m-32gb", "m-64gb", "m-128gb", "m-224gb",
+}
+
+// dropletInfoStorage contains info about droplets
+var dropletInfoStorage = map[string]DropletInfo{
+	"512mb":   {0.007, 1, 0.512, 20},
+	"1gb":     {0.015, 1, 1, 30},
+	"2gb":     {0.030, 2, 2, 40},
+	"4gb":     {0.060, 2, 4, 60},
+	"8gb":     {0.119, 4, 8, 80},
+	"16gb":    {0.238, 8, 16, 160},
+	"32gb":    {0.426, 12, 32, 320},
+	"48gb":    {0.714, 16, 48, 480},
+	"64gb":    {0.952, 20, 64, 640},
+	"m-16gb":  {0.179, 2, 16, 30},
+	"m-32gb":  {0.357, 4, 32, 90},
+	"m-64gb":  {0.714, 8, 64, 200},
+	"m-128gb": {1.429, 16, 128, 340},
+	"m-224gb": {2.500, 32, 224, 500},
+}
+
+// regions contains regions codes
+var regions = []string{
+	"nyc1", "nyc2", "nyc3", "sfo1", "sfo2", "tor1",
+	"lon1", "ams2", "ams3", "fra1", "blr1", "sgp1",
+}
+
+// regionInfoStorage contains info about regions
+var regionInfoStorage = map[string]RegionInfo{
+	"nyc1": {"New York #1", "US East"},
+	"nyc2": {"New York #2", "US East"},
+	"nyc3": {"New York #3", "US East"},
+	"sfo1": {"San Francisco #1", "US West"},
+	"sfo2": {"San Francisco #2", "US West"},
+	"tor1": {"Toronto", "Canada"},
+	"lon1": {"London", "UK"},
+	"ams2": {"Amsterdam #2", "Europe"},
+	"ams3": {"Amsterdam #3", "Europe"},
+	"fra1": {"Frankfurt", "Europe"},
+	"blr1": {"Bangalore", "Asia Pacific"},
+	"sgp1": {"Singapore", "Asia Pacific"},
+}
+
+// colorTags contains fmtc color codes
+var colorTags = []string{
+	"{c}", "{m}", "{b}", "{y}", "{g}",
+	"{c*}", "{m*}", "{b*}", "{y*}", "{g*}",
 }
 
 // temp is temp struct
@@ -261,7 +284,7 @@ func Init() {
 		return
 	}
 
-	if !arg.Has(ARG_MONITOR) && len(args) == 0 {
+	if !arg.GetB(ARG_MONITOR) && len(args) == 0 {
 		showUsage()
 		return
 	}
@@ -270,7 +293,7 @@ func Init() {
 	checkEnv()
 	checkDeps()
 
-	if arg.Has(ARG_MONITOR) {
+	if arg.GetB(ARG_MONITOR) {
 		startFarmMonitor()
 	} else {
 		processCommand(args[0], args[1:])
@@ -337,17 +360,19 @@ func processCommand(cmd string, args []string) {
 
 	switch cmd {
 	case CMD_CREATE, CMD_APPLY, CMD_START, CMD_CREATE_SHORTCUT:
-		createCommand(findAndReadPreferences(), args)
+		createCommand(getPreferences(), args)
 	case CMD_DESTROY, CMD_DELETE, CMD_STOP, CMD_DESTROY_SHORTCUT:
-		destroyCommand(findAndReadPreferences())
+		destroyCommand(getPreferences())
 	case CMD_STATUS, CMD_INFO, CMD_STATE, CMD_STATUS_SHORTCUT:
-		statusCommand(findAndReadPreferences())
+		statusCommand(getPreferences())
 	case CMD_TEMPLATES, CMD_TEMPLATES_SHORTCUT:
 		templatesCommand()
+	case CMD_RESOURCES, CMD_RESOURCES_SHORTCUT:
+		resourcesCommand()
 	case CMD_PROLONG, CMD_PROLONG_SHORTCUT:
 		prolongCommand(args)
 	case CMD_DOCTOR:
-		doctorCommand(findAndReadPreferences())
+		doctorCommand(getPreferences())
 	default:
 		terminal.PrintErrorMessage("Unknown command %s", cmd)
 		exit(1)
@@ -357,18 +382,18 @@ func processCommand(cmd string, args []string) {
 }
 
 // createCommand is create command handler
-func createCommand(prefs *Preferences, args []string) {
+func createCommand(p *prefs.Preferences, args []string) {
 	if isTerrafarmActive() {
 		terminal.PrintWarnMessage("Terrafarm already works")
 		exit(1)
 	}
 
 	if len(args) != 0 {
-		prefs.Template = args[0]
-		validatePreferences(prefs)
+		p.Template = args[0]
 	}
 
-	statusCommand(prefs)
+	validatePreferences(p)
+	statusCommand(p)
 
 	if !arg.GetB(ARG_FORCE) {
 		yes, err := terminal.ReadAnswer("Create farm with this preferences?", "n")
@@ -381,56 +406,66 @@ func createCommand(prefs *Preferences, args []string) {
 		fmtutil.Separator(false)
 	}
 
-	vars, err := prefsToArgs(prefs)
+	vars, err := prefsToArgs(p)
 
 	if err != nil {
 		terminal.PrintErrorMessage("Can't parse preferences: %v", err)
 		exit(1)
 	}
 
-	addSignalInterception()
+	printDebug("EXEC → terraform apply %s", strings.Join(vars, " "))
 
-	if arg.GetB(ARG_DEBUG) {
-		fmtc.Printf("{s-}EXEC → terraform apply %s{!}\n\n", strings.Join(vars, " "))
-	}
+	// Current moment + 90 seconds for starting droplets
+	farmStartTime := time.Now().Unix() + 90
 
-	fsutil.Push(path.Join(getDataDir(), prefs.Template))
+	fsutil.Push(path.Join(getDataDir(), p.Template))
 
 	err = execTerraform(false, "apply", vars)
+
+	fsutil.Pop()
 
 	if err != nil {
 		terminal.PrintErrorMessage("\nError while executing terraform: %v", err)
 		exit(1)
 	}
 
-	fsutil.Pop()
-
 	fmtutil.Separator(false)
 
-	if prefs.Output != "" {
+	if p.Output != "" {
 		fmtc.Println("Exporting info about build nodes...")
 
-		err = exportNodeList(prefs)
+		err = exportNodeList(p)
 
 		if err != nil {
 			terminal.PrintErrorMessage("Error while exporting info: %v", err)
 		} else {
-			fmtc.Printf("{g}Info about build nodes saved as %s{!}\n", prefs.Output)
+			fmtc.Printf("{g}Info about build nodes saved as %s{!}\n", p.Output)
 		}
 
 		fmtutil.Separator(false)
 	} else {
 		fmtc.Println("Access credentials for created build nodes:\n")
 
-		printNodesInfo(prefs)
+		printNodesInfo(p)
 
 		fmtutil.Separator(false)
 	}
 
-	if prefs.TTL > 0 {
+	if p.TTL > 0 {
 		fmtc.Printf("Starting monitoring process... ")
 
-		err = startMonitorProcess(prefs, false)
+		err = saveMonitorState(&MonitorState{
+			DestroyAfter: time.Now().Unix() + p.TTL*60,
+			MaxWait:      p.MaxWait * 60,
+		})
+
+		if err != nil {
+			fmtc.NewLine()
+			terminal.PrintErrorMessage("Error while saving monitoring process state: %v", err)
+			exit(1)
+		}
+
+		err = startMonitorProcess(false)
 
 		if err != nil {
 			fmtc.NewLine()
@@ -443,7 +478,7 @@ func createCommand(prefs *Preferences, args []string) {
 		fmtutil.Separator(false)
 	}
 
-	saveState(prefs)
+	saveState(p, farmStartTime)
 
 	if arg.GetB(ARG_NOTIFY) {
 		fmtc.Bell()
@@ -451,8 +486,13 @@ func createCommand(prefs *Preferences, args []string) {
 }
 
 // statusCommand is status command handler
-func statusCommand(prefs *Preferences) {
+func statusCommand(p *prefs.Preferences) {
 	var (
+		err error
+
+		farmState    *FarmState
+		monitorState *MonitorState
+
 		tokenValid       do.StatusCode
 		fingerprintValid do.StatusCode
 		regionValid      do.StatusCode
@@ -469,8 +509,6 @@ func statusCommand(prefs *Preferences) {
 
 		buildersTotal   int
 		buildersBullets string
-
-		fingerprint string
 	)
 
 	var (
@@ -479,100 +517,122 @@ func statusCommand(prefs *Preferences) {
 	)
 
 	disableValidation = arg.GetB(ARG_NO_VALIDATE)
-	fingerprint, _ = getFingerprint(prefs.Key + ".pub")
 
 	if terrafarmActive {
-		farmState, err := readFarmState()
+		farmState, err = readFarmState()
 
 		if err == nil {
 			disableValidation = true
-			prefs = farmState.Preferences
-			fingerprint = farmState.Fingerprint
+			p = farmState.Preferences
 		}
 	}
 
-	buildersTotal = getBuildNodesCount(prefs.Template)
+	buildersTotal = getBuildNodesCount(p.Template)
 
-	totalUsagePriceMin = calculateUsagePrice(prefs.TTL, buildersTotal, prefs.NodeSize)
+	totalUsagePriceMin = calculateUsagePrice(p.TTL, buildersTotal, p.NodeSize)
 
-	if prefs.MaxWait > 0 {
+	if terrafarmActive {
+		usageHours := int64(time.Since(time.Unix(farmState.Started, 0)).Hours() * 60)
+		currentUsagePrice = calculateUsagePrice(usageHours, buildersTotal, p.NodeSize)
+	}
+
+	if p.MaxWait > 0 {
 		totalUsagePriceMax = totalUsagePriceMin
-		totalUsagePriceMax += calculateUsagePrice(prefs.MaxWait, buildersTotal, prefs.NodeSize)
+		totalUsagePriceMax += calculateUsagePrice(p.MaxWait, buildersTotal, p.NodeSize)
 	}
 
 	if monitorActive {
-		state, err := readMonitorState()
+		monitorState, err = readMonitorState()
 
 		if err == nil {
-			waitBuildComplete = state.MaxWait > 0
-			ttlRemain = state.DestroyAfter - time.Now().Unix()
-			usageHours := int64(time.Since(time.Unix(state.Started, 0)).Hours() * 60)
-			currentUsagePrice = calculateUsagePrice(usageHours, buildersTotal, prefs.NodeSize)
+			waitBuildComplete = monitorState.MaxWait > 0
+			ttlRemain = monitorState.DestroyAfter - time.Now().Unix()
 		}
 
-		buildersBullets = getBuildBullets(prefs)
+		buildersBullets = getBuildBullets(p)
 	}
 
 	if !disableValidation {
-		tokenValid = do.IsValidToken(prefs.Token)
-		fingerprintValid = do.IsFingerprintValid(prefs.Token, fingerprint)
-		regionValid = do.IsRegionValid(prefs.Token, prefs.Region)
-		sizeValid = do.IsSizeValid(prefs.Token, prefs.NodeSize)
+		tokenValid = do.IsValidToken(p.Token)
+		fingerprintValid = do.IsFingerprintValid(p.Token, p.Fingerprint)
+
+		if p.Template != "" {
+			regionValid = do.IsRegionValid(p.Token, p.Region)
+			sizeValid = do.IsSizeValid(p.Token, p.NodeSize)
+		}
 	}
 
 	fmtutil.Separator(false, "TERRAFARM")
 
-	fmtc.Printf(
-		"  {*}%-16s{!} %s {s-}(%s){!}\n", "Template:", prefs.Template,
-		pluralize.Pluralize(buildersTotal, "build node", "build nodes"),
-	)
-
-	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getMaskedToken(prefs.Token))
-
-	printValidationMarker(tokenValid, disableValidation)
-
-	fmtc.Printf("  {*}%-16s{!} %s\n", "Private Key:", prefs.Key)
-	fmtc.Printf("  {*}%-16s{!} %s\n", "Public Key:", prefs.Key+".pub")
-
-	fmtc.Printf("  {*}%-16s{!} %s", "Fingerprint:", fingerprint)
-
-	printValidationMarker(fingerprintValid, disableValidation)
-
-	switch {
-	case prefs.TTL <= 0:
-		fmtc.Printf("  {*}%-16s{!} {r}disabled{!}", "TTL:")
-	case prefs.TTL > 360:
-		fmtc.Printf("  {*}%-16s{!} {r}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
-	case prefs.TTL > 120:
-		fmtc.Printf("  {*}%-16s{!} {y}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
-	default:
-		fmtc.Printf("  {*}%-16s{!} {g}%s{!}", "TTL:", timeutil.PrettyDuration(prefs.TTL*60))
+	if p.Template != "" {
+		fmtc.Printf(
+			"  {*}%-16s{!} %s {s-}(%s){!}\n", "Template:", p.Template,
+			pluralize.Pluralize(buildersTotal, "build node", "build nodes"),
+		)
 	}
 
-	if prefs.MaxWait > 0 {
-		fmtc.Printf("{s-} + %s wait{!}", pluralize.Pluralize(int(prefs.MaxWait), "minute", "minutes"))
+	fmtc.Printf("  {*}%-16s{!} %s", "Token:", getPrettyToken(p.Token))
+
+	printValidationMarker(tokenValid, disableValidation, true)
+
+	fmtc.Printf("  {*}%-16s{!} %s\n", "Private Key:", p.Key)
+	fmtc.Printf("  {*}%-16s{!} %s\n", "Public Key:", p.Key+".pub")
+
+	fmtc.Printf("  {*}%-16s{!} %s", "Fingerprint:", p.Fingerprint)
+
+	printValidationMarker(fingerprintValid, disableValidation, true)
+
+	if p.Template != "" {
+		switch {
+		case p.TTL <= 0:
+			fmtc.Printf("  {*}%-16s{!} {r}disabled{!}", "TTL:")
+		case p.TTL > 360:
+			fmtc.Printf("  {*}%-16s{!} {r}%s{!}", "TTL:", timeutil.PrettyDuration(p.TTL*60))
+		case p.TTL > 120:
+			fmtc.Printf("  {*}%-16s{!} {y}%s{!}", "TTL:", timeutil.PrettyDuration(p.TTL*60))
+		default:
+			fmtc.Printf("  {*}%-16s{!} {g}%s{!}", "TTL:", timeutil.PrettyDuration(p.TTL*60))
+		}
+
+		if p.MaxWait > 0 {
+			fmtc.Printf("{s-} + %s wait{!}", pluralize.Pluralize(int(p.MaxWait), "minute", "minutes"))
+		}
+
+		if p.TTL <= 0 || totalUsagePriceMin <= 0 {
+			fmtc.NewLine()
+		} else if totalUsagePriceMin > 0 && totalUsagePriceMax > 0 {
+			fmtc.Printf(" {s-}(~ $%.2f - $%.2f){!}\n", totalUsagePriceMin, totalUsagePriceMax)
+		} else {
+			fmtc.Printf(" {s-}(~ $%.2f){!}\n", totalUsagePriceMin)
+		}
+
+		fmtc.Printf("  {*}%-16s{!} %s", "Region:", p.Region)
+
+		printValidationMarker(regionValid, disableValidation, true)
+
+		fmtc.Printf("  {*}%-16s{!} %s", "Node size:", p.NodeSize)
+
+		printValidationMarker(sizeValid, disableValidation, false)
+
+		if dropletInfoStorage[p.NodeSize].CPU != 0 {
+			if disableValidation {
+				fmt.Printf(" ")
+			}
+
+			fmtc.Printf(
+				"{s-}(%s + %d GB Disk){!}\n",
+				pluralize.Pluralize(dropletInfoStorage[p.NodeSize].CPU, "CPU", "CPUs"),
+				dropletInfoStorage[p.NodeSize].Disk,
+			)
+		} else {
+			fmtc.NewLine()
+		}
+
+		fmtc.Printf("  {*}%-16s{!} %s\n", "User:", p.User)
 	}
 
-	if prefs.TTL <= 0 || totalUsagePriceMin <= 0 {
-		fmtc.NewLine()
-	} else if totalUsagePriceMin > 0 && totalUsagePriceMax > 0 {
-		fmtc.Printf(" {s-}(~ $%.2f - $%.2f){!}\n", totalUsagePriceMin, totalUsagePriceMax)
-	} else {
-		fmtc.Printf(" {s-}(~ $%.2f){!}\n", totalUsagePriceMin)
-	}
-
-	fmtc.Printf("  {*}%-16s{!} %s", "Region:", prefs.Region)
-
-	printValidationMarker(regionValid, disableValidation)
-
-	fmtc.Printf("  {*}%-16s{!} %s", "Node size:", prefs.NodeSize)
-
-	printValidationMarker(sizeValid, disableValidation)
-
-	fmtc.Printf("  {*}%-16s{!} %s\n", "User:", prefs.User)
-
-	if prefs.Output != "" {
-		fmtc.Printf("  {*}%-16s{!} %s\n", "Output:", prefs.Output)
+	if p.Output != "" {
+		fmtc.Printf("  {*}%-16s{!} %s\n", "Output:", p.Output)
 	}
 
 	fmtc.NewLine()
@@ -616,7 +676,7 @@ func statusCommand(prefs *Preferences) {
 }
 
 // destroyCommand is destroy command handler
-func destroyCommand(prefs *Preferences) {
+func destroyCommand(prefs *prefs.Preferences) {
 	if !isTerrafarmActive() {
 		terminal.PrintWarnMessage("Terrafarm does not works, nothing to destroy")
 		exit(1)
@@ -649,33 +709,40 @@ func destroyCommand(prefs *Preferences) {
 		}
 	}
 
-	fmtutil.Separator(false)
+	farmState, err := readFarmState()
 
-	priceMessage, priceMessageComment := getUsagePriceMessage()
+	if err != nil {
+		terminal.PrintErrorMessage("Can't read farm state: %v", err)
+		exit(1)
+	}
 
-	vars, err := prefsToArgs(prefs, "-force")
+	p := farmState.Preferences
+	p.Token = prefs.Token
+	p.Password = prefs.Password
+
+	vars, err := prefsToArgs(p, "-force")
 
 	if err != nil {
 		terminal.PrintErrorMessage("Can't parse prefs: %v", err)
 		exit(1)
 	}
 
-	addSignalInterception()
+	priceMessage, priceMessageComment := getUsagePriceMessage()
 
-	if arg.GetB(ARG_DEBUG) {
-		fmtc.Printf("{s-}EXEC → terraform destroy %s{!}\n\n", strings.Join(vars, " "))
-	}
+	fmtutil.Separator(false)
 
-	fsutil.Push(path.Join(getDataDir(), prefs.Template))
+	printDebug("EXEC → terraform destroy %s", strings.Join(vars, " "))
+
+	fsutil.Push(path.Join(getDataDir(), p.Template))
 
 	err = execTerraform(false, "destroy", vars)
+
+	fsutil.Pop()
 
 	if err != nil {
 		terminal.PrintErrorMessage("\nError while executing terraform: %v", err)
 		exit(1)
 	}
-
-	fsutil.Pop()
 
 	fmtutil.Separator(false)
 
@@ -694,7 +761,7 @@ func destroyCommand(prefs *Preferences) {
 func templatesCommand() {
 	templates := fsutil.List(
 		getDataDir(), true,
-		&fsutil.ListingFilter{Perms: "DRX"},
+		fsutil.ListingFilter{Perms: "DRX"},
 	)
 
 	if len(templates) == 0 {
@@ -713,6 +780,27 @@ func templatesCommand() {
 			"  %s {s-}(%s){!}\n", template,
 			pluralize.Pluralize(buildersCount, "build node", "build nodes"),
 		)
+	}
+
+	fmtutil.Separator(false)
+}
+
+// templatesCommand is resources command handler
+func resourcesCommand() {
+	fmtutil.Separator(false, "DROPLETS")
+
+	for _, d := range droplets {
+		di := dropletInfoStorage[d]
+		fmtc.Printf("  {c}%7s{!} $%g/hr {s-}(%s + %g GB Memory + %d GB Disk){!}\n", d,
+			di.Price, pluralize.Pluralize(di.CPU, "CPU", "CPUs"), di.Memory, di.Disk,
+		)
+	}
+
+	fmtutil.Separator(false, "REGIONS")
+
+	for _, r := range regions {
+		ri := regionInfoStorage[r]
+		fmtc.Printf("  {y}%s{!} %s {s-}(%s){!}\n", r, ri.DCName, ri.RegionName)
 	}
 
 	fmtutil.Separator(false)
@@ -847,7 +935,7 @@ func prolongCommand(args []string) {
 
 	fmtc.Printf("Starting monitoring process... ")
 
-	err = startMonitorProcess(farmState.Preferences, true)
+	err = startMonitorProcess(true)
 
 	if err != nil {
 		terminal.PrintErrorMessage("ERROR\n")
@@ -861,7 +949,7 @@ func prolongCommand(args []string) {
 }
 
 // doctorCommand fix problems with farm
-func doctorCommand(prefs *Preferences) {
+func doctorCommand(p *prefs.Preferences) {
 	fmtc.Println("\nThis command can solve almost all problems that can occur with farm.")
 	fmtc.Println("This is list of actions which will be performed:\n")
 
@@ -882,14 +970,14 @@ func doctorCommand(prefs *Preferences) {
 	terraformStateFile := getTerraformStateFilePath()
 	terrafarmStateFile := getFarmStateFilePath()
 
-	terrafarmDroplets, err := do.GetTerrafarmDropletsList(prefs.Token)
+	terrafarmDroplets, err := do.GetTerrafarmDropletsList(p.Token)
 
 	if err != nil {
 		terminal.PrintErrorMessage(err.Error())
 		exit(1)
 	}
 
-	fmtc.Println("Terrafarm monitor stoppped")
+	fmtc.Println("  Terrafarm monitor stoppped")
 	fmtc.Printf("  File %s removed\n", terraformStateFile)
 	fmtc.Printf("  File %s removed\n", terrafarmStateFile)
 
@@ -909,34 +997,28 @@ func doctorCommand(prefs *Preferences) {
 	fmtc.NewLine()
 
 	printErrorStatusMarker(killMonitorProcess())
-
 	fmtc.Println("Terrafarm monitor stoppped")
 
 	printErrorStatusMarker(os.Remove(terraformStateFile))
-
 	fmtc.Printf("File %s removed\n", terraformStateFile)
 
 	printErrorStatusMarker(os.Remove(terrafarmStateFile))
-
 	fmtc.Printf("File %s removed\n", terrafarmStateFile)
 
-	printErrorStatusMarker(do.DestroyTerrafarmDroplets(prefs.Token))
-
+	printErrorStatusMarker(do.DestroyTerrafarmDroplets(p.Token))
 	fmtc.Println("Terrafarm droplets destroyed")
 
 	fmtc.NewLine()
 }
 
 // saveFarmState collect and save farm state into file
-func saveState(prefs *Preferences) {
-	fingerprint, _ := getFingerprint(prefs.Key + ".pub")
-
+func saveState(p *prefs.Preferences, farmStartTime int64) {
 	farmState := &FarmState{
-		Preferences: prefs,
-		Fingerprint: fingerprint,
+		Preferences: p,
+		Started:     farmStartTime,
 	}
 
-	farmState.Preferences.Token = getCryptedToken(prefs.Token)
+	farmState.Preferences.Token = getMaskedToken(p.Token)
 	farmState.Preferences.Password = ""
 
 	err := saveFarmState(farmState)
@@ -947,16 +1029,20 @@ func saveState(prefs *Preferences) {
 }
 
 // printValidationMarker print validation mark
-func printValidationMarker(value do.StatusCode, disableValidate bool) {
-	switch {
-	case disableValidate == true:
-		fmtc.Printf("\n")
-	case value == do.STATUS_OK:
-		fmtc.Printf(" {g}✔ {!}\n")
-	case value == do.STATUS_NOT_OK:
-		fmtc.Printf(" {r}✘ {!}\n")
-	case value == do.STATUS_ERROR:
-		fmtc.Printf(" {y*}? {!}\n")
+func printValidationMarker(value do.StatusCode, disableValidate, newLine bool) {
+	if !disableValidate {
+		switch {
+		case value == do.STATUS_OK:
+			fmtc.Printf(" {g}✔ {!}")
+		case value == do.STATUS_NOT_OK:
+			fmtc.Printf(" {r}✘ {!}")
+		case value == do.STATUS_ERROR:
+			fmtc.Printf(" {y*}? {!}")
+		}
+	}
+
+	if newLine {
+		fmtc.NewLine()
 	}
 }
 
@@ -970,25 +1056,8 @@ func printErrorStatusMarker(err error) {
 	}
 }
 
-// getFingerprint return fingerprint for public key
-func getFingerprint(key string) (string, error) {
-	data, err := ioutil.ReadFile(key)
-
-	if err != nil {
-		return "", err
-	}
-
-	pubkey, err := sshkey.UnmarshalPublicKey(string(data[:]))
-
-	if err != nil {
-		return "", err
-	}
-
-	return sshkey.PrettyFingerprint(pubkey, crypto.MD5)
-}
-
-// getMaskedToken return first and last 8 symbols of token
-func getMaskedToken(token string) string {
+// getPrettyToken return first and last 8 symbols of token
+func getPrettyToken(token string) string {
 	if len(token) != 64 {
 		return ""
 	}
@@ -996,8 +1065,8 @@ func getMaskedToken(token string) string {
 	return token[:8] + "..." + token[56:]
 }
 
-// getCryptedToken return token with masked part
-func getCryptedToken(token string) string {
+// getMaskedToken return token with masked part
+func getMaskedToken(token string) string {
 	if len(token) != 64 {
 		return ""
 	}
@@ -1006,8 +1075,8 @@ func getCryptedToken(token string) string {
 }
 
 // getBuildBullets return colored string with bullets
-func getBuildBullets(prefs *Preferences) string {
-	nodes := getBuildNodesInfo(prefs)
+func getBuildBullets(p *prefs.Preferences) string {
+	nodes := getBuildNodesInfo(p)
 
 	if len(nodes) == 0 {
 		return "{y}unknown{!}"
@@ -1021,7 +1090,7 @@ func getBuildBullets(prefs *Preferences) string {
 			result += "{g}•{!}"
 
 		case STATE_INACTIVE:
-			result += "{s-}•{!}"
+			result += "{s}•{!}"
 
 		default:
 			result += "{r}•{!}"
@@ -1032,8 +1101,8 @@ func getBuildBullets(prefs *Preferences) string {
 }
 
 // prefsToArgs return preferences as command line arguments for terraform
-func prefsToArgs(prefs *Preferences, args ...string) ([]string, error) {
-	varsData, err := prefs.GetVariablesData()
+func prefsToArgs(p *prefs.Preferences, args ...string) ([]string, error) {
+	varsData, err := p.GetVariablesData()
 
 	if err != nil {
 		return nil, err
@@ -1071,16 +1140,23 @@ func execTerraform(logOutput bool, command string, args []string) error {
 		cmd.Args = append(cmd.Args, strings.Split(strings.Join(args, " "), " ")...)
 	}
 
-	reader, err := cmd.StdoutPipe()
+	stdoutReader, err := cmd.StdoutPipe()
 
 	if err != nil {
 		return fmtc.Errorf("Can't redirect output: %v", err)
 	}
 
+	var stderrBuffer bytes.Buffer
+
+	cmd.Stderr = &stderrBuffer
+
 	statusLines := false
-	scanner := bufio.NewScanner(reader)
+	scanner := bufio.NewScanner(stdoutReader)
 
 	go func() {
+		// map nodeName -> color
+		colorStore := make(map[string]string)
+
 		for scanner.Scan() {
 			text := scanner.Text()
 
@@ -1106,7 +1182,7 @@ func execTerraform(logOutput bool, command string, args []string) error {
 					}
 				}
 
-				fmtc.Printf("  %s\n", getColoredCommandOutput(text))
+				fmtc.Printf("  %s\n", getColoredCommandOutput(colorStore, text))
 			}
 		}
 	}()
@@ -1120,41 +1196,71 @@ func execTerraform(logOutput bool, command string, args []string) error {
 	err = cmd.Wait()
 
 	if err != nil {
-		return fmtc.Errorf("Can't process terraform output: %v", err)
+		return fmtc.Errorf(stderrBuffer.String())
 	}
 
 	return nil
 }
 
+// getPreferencies
+func getPreferences() *prefs.Preferences {
+	p, errs := prefs.FindAndReadPreferences(getDataDir())
+
+	if len(errs) != 0 {
+		for _, err := range errs {
+			terminal.PrintErrorMessage(err.Error())
+		}
+
+		os.Exit(1)
+	}
+
+	return p
+}
+
+func validatePreferences(p *prefs.Preferences) {
+	errs := p.Validate(getDataDir(), false)
+
+	if len(errs) != 0 {
+		for _, err := range errs {
+			terminal.PrintErrorMessage(err.Error())
+		}
+
+		os.Exit(1)
+	}
+}
+
 // getColoredCommandOutput return command output with colored remote-exec
-func getColoredCommandOutput(line string) string {
+func getColoredCommandOutput(colorStore map[string]string, line string) string {
+
 	// Remove garbage from line
 	line = strings.Replace(line, "\x1b[0m\x1b[0m", "", -1)
 
-	switch {
-	case strings.Contains(line, "-x32 (remote-exec)"):
-		return fmtc.Sprintf("{c}%s{!}", line)
-
-	case strings.Contains(line, "-x48 (remote-exec)"):
-		return fmtc.Sprintf("{b}%s{!}", line)
-
-	case strings.Contains(line, "-x64 (remote-exec)"):
-		return fmtc.Sprintf("{m}%s{!}", line)
-
-	default:
+	if !strings.Contains(line, "(remote-exec)") {
 		return line
 	}
+
+	nodeNameEnd := strings.Index(line, " ")
+
+	if nodeNameEnd == -1 {
+		return line
+	}
+
+	nodeName := line[:nodeNameEnd]
+	colorTag := colorStore[nodeName]
+
+	if colorTag == "" {
+		colorTag = colorTags[len(colorStore)]
+		colorStore[nodeName] = colorTag
+	}
+
+	line = strings.Replace(line, nodeName+" (remote-exec):", colorTag+nodeName+" (remote-exec):{!}", -1)
+
+	return fmtc.Sprintf(line)
 }
 
 // getUsagePriceMessage return message with usage price
 func getUsagePriceMessage() (string, string) {
 	if !isMonitorActive() {
-		return "", ""
-	}
-
-	state, err := readMonitorState()
-
-	if err != nil {
 		return "", ""
 	}
 
@@ -1165,40 +1271,32 @@ func getUsagePriceMessage() (string, string) {
 	}
 
 	buildersTotal := getBuildNodesCount(farmState.Preferences.Template)
-	usageHours := time.Since(time.Unix(state.Started, 0)).Hours()
-	usageMinutes := int(time.Since(time.Unix(state.Started, 0)).Minutes())
-	currentUsagePrice := (usageHours * dropletPrices[farmState.Preferences.NodeSize]) * float64(buildersTotal)
+	usageHours := time.Since(time.Unix(farmState.Started, 0)).Hours()
+	usageMinutes := int(time.Since(time.Unix(farmState.Started, 0)).Minutes())
+	currentUsagePrice := (usageHours * dropletInfoStorage[farmState.Preferences.NodeSize].Price) * float64(buildersTotal)
 	currentUsagePrice = mathutil.BetweenF(currentUsagePrice, 0.01, 1000000.0)
 
 	switch buildersTotal {
 	case 1:
-		return fmtc.Sprintf("$%.2f", currentUsagePrice),
+		return fmtc.Sprintf("~ $%.2f", currentUsagePrice),
 			fmtc.Sprintf("%s × %d min", farmState.Preferences.NodeSize, usageMinutes)
 	default:
-		return fmtc.Sprintf("$%.2f", currentUsagePrice),
+		return fmtc.Sprintf("~ $%.2f", currentUsagePrice),
 			fmtc.Sprintf("%d × %s × %d min", buildersTotal, farmState.Preferences.NodeSize, usageMinutes)
 	}
 }
 
 // calculateUsagePrice calculate usage price
 func calculateUsagePrice(time int64, nodeNum int, nodeSize string) float64 {
-	if dropletPrices[nodeSize] == 0.0 {
+	if dropletInfoStorage[nodeSize].Price == 0.0 {
 		return 0.0
 	}
 
 	hours := float64(time) / 60.0
-	price := (hours * dropletPrices[nodeSize]) * float64(nodeNum)
+	price := (hours * dropletInfoStorage[nodeSize].Price) * float64(nodeNum)
 	price = mathutil.BetweenF(price, 0.01, 1000000.0)
 
 	return price
-}
-
-// addSignalInterception add interceptors for INT и TERM signals
-func addSignalInterception() {
-	signal.Handlers{
-		signal.INT:  signalInterceptor,
-		signal.TERM: signalInterceptor,
-	}.TrackAsync()
 }
 
 // isTerrafarmActive return true if terrafarm already active
@@ -1209,13 +1307,13 @@ func isTerrafarmActive() bool {
 		return false
 	}
 
-	state, err := readTFState(stateFile)
+	tfState, err := terraform.ReadState(stateFile)
 
 	if err != nil {
 		return true
 	}
 
-	return len(state.Modules[0].Resources) != 0
+	return len(tfState.Modules[0].Resources) != 0
 }
 
 // getBuildNodesCount return number of nodes in given farm template
@@ -1224,7 +1322,7 @@ func getBuildNodesCount(template string) int {
 
 	builders := fsutil.List(
 		templateDir, true,
-		&fsutil.ListingFilter{
+		fsutil.ListingFilter{
 			MatchPatterns: []string{"builder*.tf"},
 		},
 	)
@@ -1302,20 +1400,20 @@ func readFarmState() (*FarmState, error) {
 }
 
 // collectNodesInfo collect base info about build nodes
-func collectNodesInfo(prefs *Preferences) ([]*NodeInfo, error) {
-	state, err := readTFState(getTerraformStateFilePath())
+func collectNodesInfo(p *prefs.Preferences) ([]*NodeInfo, error) {
+	tfState, err := terraform.ReadState(getTerraformStateFilePath())
 
 	if err != nil {
 		return nil, fmtc.Errorf("Can't read state file: %v", err)
 	}
 
-	if len(state.Modules) == 0 || len(state.Modules[0].Resources) == 0 {
+	if len(tfState.Modules) == 0 || len(tfState.Modules[0].Resources) == 0 {
 		return nil, nil
 	}
 
 	var result []*NodeInfo
 
-	for _, node := range state.Modules[0].Resources {
+	for _, node := range tfState.Modules[0].Resources {
 		if node.Info == nil || node.Info.Attributes == nil {
 			continue
 		}
@@ -1323,8 +1421,8 @@ func collectNodesInfo(prefs *Preferences) ([]*NodeInfo, error) {
 		node := &NodeInfo{
 			Name:     node.Info.Attributes.Name,
 			IP:       node.Info.Attributes.IP,
-			User:     prefs.User,
-			Password: prefs.Password,
+			User:     p.User,
+			Password: p.Password,
 			State:    STATE_UNKNOWN,
 		}
 
@@ -1345,8 +1443,8 @@ func collectNodesInfo(prefs *Preferences) ([]*NodeInfo, error) {
 }
 
 // printNodesInfo collect and print info about build nodes
-func printNodesInfo(prefs *Preferences) {
-	nodesInfo, err := collectNodesInfo(prefs)
+func printNodesInfo(p *prefs.Preferences) {
+	nodesInfo, err := collectNodesInfo(p)
 
 	if err != nil {
 		terminal.PrintErrorMessage("Can't collect nodes info: %v", err)
@@ -1362,20 +1460,20 @@ func printNodesInfo(prefs *Preferences) {
 }
 
 // exportNodeList exports info about nodes for usage in rpmbuilder
-func exportNodeList(prefs *Preferences) error {
-	if fsutil.IsExist(prefs.Output) {
-		if fsutil.IsDir(prefs.Output) {
+func exportNodeList(p *prefs.Preferences) error {
+	if fsutil.IsExist(p.Output) {
+		if fsutil.IsDir(p.Output) {
 			return fmtc.Errorf("Output path must be path to file")
 		}
 
-		if !fsutil.IsWritable(prefs.Output) {
+		if !fsutil.IsWritable(p.Output) {
 			return fmtc.Errorf("Output path must be path to writable file")
 		}
 
-		os.Remove(prefs.Output)
+		os.Remove(p.Output)
 	}
 
-	fd, err := os.OpenFile(prefs.Output, os.O_CREATE|os.O_WRONLY, 0644)
+	fd, err := os.OpenFile(p.Output, os.O_CREATE|os.O_WRONLY, 0644)
 
 	if err != nil {
 		return err
@@ -1383,7 +1481,7 @@ func exportNodeList(prefs *Preferences) error {
 
 	defer fd.Close()
 
-	nodesInfo, err := collectNodesInfo(prefs)
+	nodesInfo, err := collectNodesInfo(p)
 
 	if err != nil {
 		return err
@@ -1400,18 +1498,14 @@ func exportNodeList(prefs *Preferences) error {
 	return nil
 }
 
-// signalInterceptor is TERM and INT signal handler
-func signalInterceptor() {
-	terminal.PrintWarnMessage("\nYou can't cancel command execution in this time")
-}
-
 // getSpellcheckModel return spellcheck model for correcting
 // given command name
 func getSpellcheckModel() *spellcheck.Model {
 	return spellcheck.Train([]string{
-		CMD_CREATE, CMD_APPLY, CMD_START,
-		CMD_DESTROY, CMD_DELETE, CMD_STOP,
-		CMD_STATUS, CMD_INFO, CMD_STATE,
+		CMD_APPLY, CMD_CREATE, CMD_DELETE, CMD_DESTROY,
+		CMD_DOCTOR, CMD_INFO, CMD_PROLONG, CMD_START,
+		CMD_STATE, CMD_STATUS, CMD_STOP, CMD_TEMPLATES,
+		CMD_RESOURCES,
 	})
 }
 
@@ -1420,7 +1514,7 @@ func getSpellcheckModel() *spellcheck.Model {
 func cleanTerraformGarbage() {
 	garbage := fsutil.List(
 		"/tmp", false,
-		&fsutil.ListingFilter{
+		fsutil.ListingFilter{
 			MatchPatterns: []string{"tf-plugin*", "plugin*"},
 			CTimeYounger:  startTime,
 		},
@@ -1437,6 +1531,19 @@ func cleanTerraformGarbage() {
 	}
 }
 
+// printDebug print debug message if debug mode enabled
+func printDebug(message string, args ...interface{}) {
+	if !arg.GetB(ARG_DEBUG) {
+		return
+	}
+
+	if len(args) == 0 {
+		fmtc.Printf("{s-}%s{!}\n\n", message)
+	} else {
+		fmtc.Printf("{s-}%s{!}\n\n", fmt.Sprintf(message, args...))
+	}
+}
+
 // exit exit from app with given code
 func exit(code int) {
 	if !arg.GetB(ARG_DEBUG) {
@@ -1444,6 +1551,7 @@ func exit(code int) {
 	}
 
 	cleanTerraformGarbage()
+
 	os.Exit(code)
 }
 
@@ -1451,15 +1559,14 @@ func exit(code int) {
 
 // showUsage show help content
 func showUsage() {
-	usage.Breadcrumbs = true
-
 	info := usage.NewInfo("")
 
-	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean", "template-name")
+	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean", "?template-name")
 	info.AddCommand(CMD_DESTROY, "Destroy farm droplets on DigitalOcean")
 	info.AddCommand(CMD_STATUS, "Show current Terrafarm preferences and status")
 	info.AddCommand(CMD_TEMPLATES, "List all available farm templates")
-	info.AddCommand(CMD_PROLONG, "Increase TTL or set max wait time", "ttl max-wait")
+	info.AddCommand(CMD_RESOURCES, "List available resources {s-}(droplets & regions){!}")
+	info.AddCommand(CMD_PROLONG, "Increase TTL or set max wait time", "ttl", "?max-wait")
 	info.AddCommand(CMD_DOCTOR, "Fix problems with farm")
 
 	info.AddOption(ARG_TTL, "Max farm TTL {s-}(Time To Live){!}", "time")
@@ -1491,12 +1598,13 @@ func showUsage() {
 // showAbout show info about utility
 func showAbout() {
 	about := &usage.About{
-		App:     APP,
-		Version: VER,
-		Desc:    DESC,
-		Year:    2006,
-		Owner:   "ESSENTIAL KAOS",
-		License: "Essential Kaos Open Source License <https://essentialkaos.com/ekol?en>",
+		App:           APP,
+		Version:       VER,
+		Desc:          DESC,
+		Year:          2006,
+		Owner:         "ESSENTIAL KAOS",
+		License:       "Essential Kaos Open Source License <https://essentialkaos.com/ekol>",
+		UpdateChecker: usage.UpdateChecker{"essentialkaos/terrafarm", update.GitHubChecker},
 	}
 
 	about.Render()
