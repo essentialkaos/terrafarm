@@ -111,6 +111,7 @@ Commands
   destroy                 Destroy farm droplets on DigitalOcean
   status                  Show current Terrafarm preferences and status
   templates               List all available farm templates
+  resources               List available resources (droplets & regions)
   prolong ttl max-wait    Increase TTL or set max wait time
   doctor                  Fix problems with farm
 
@@ -123,7 +124,7 @@ Options
   --key, -K key-file         Path to private key
   --region, -R region        DigitalOcean region
   --node-size, -N size       Droplet size on DigitalOcean
-  --user, -U username        Build node user login
+  --user, -U username        Build node user name
   --password, -P password    Build node user password
   --force, -f                Force command execution
   --no-validate, -nv         Don't validate preferences
