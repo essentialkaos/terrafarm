@@ -14,13 +14,13 @@ import (
 	"strings"
 	"time"
 
-	"pkg.re/essentialkaos/ek.v7/fmtc"
-	"pkg.re/essentialkaos/ek.v7/fsutil"
-	"pkg.re/essentialkaos/ek.v7/jsonutil"
-	"pkg.re/essentialkaos/ek.v7/log"
-	"pkg.re/essentialkaos/ek.v7/path"
-	"pkg.re/essentialkaos/ek.v7/signal"
-	"pkg.re/essentialkaos/ek.v7/timeutil"
+	"pkg.re/essentialkaos/ek.v8/fmtc"
+	"pkg.re/essentialkaos/ek.v8/fsutil"
+	"pkg.re/essentialkaos/ek.v8/jsonutil"
+	"pkg.re/essentialkaos/ek.v8/log"
+	"pkg.re/essentialkaos/ek.v8/path"
+	"pkg.re/essentialkaos/ek.v8/signal"
+	"pkg.re/essentialkaos/ek.v8/timeutil"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
