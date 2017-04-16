@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"pkg.re/essentialkaos/ek.v7/req"
+	"pkg.re/essentialkaos/ek.v8/req"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
