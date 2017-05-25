@@ -13,11 +13,11 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"pkg.re/essentialkaos/ek.v8/arg"
-	"pkg.re/essentialkaos/ek.v8/env"
-	"pkg.re/essentialkaos/ek.v8/fsutil"
-	"pkg.re/essentialkaos/ek.v8/passwd"
-	"pkg.re/essentialkaos/ek.v8/timeutil"
+	"pkg.re/essentialkaos/ek.v9/env"
+	"pkg.re/essentialkaos/ek.v9/fsutil"
+	"pkg.re/essentialkaos/ek.v9/options"
+	"pkg.re/essentialkaos/ek.v9/passwd"
+	"pkg.re/essentialkaos/ek.v9/timeutil"
 
 	"gopkg.in/hlandau/passlib.v1/hash/sha2crypt"
 
@@ -56,15 +56,15 @@ const (
 
 // List of supported command-line arguments
 const (
-	ARG_TTL       = "t:ttl"
-	ARG_OUTPUT    = "o:output"
-	ARG_TOKEN     = "T:token"
-	ARG_KEY       = "K:key"
-	ARG_REGION    = "R:region"
-	ARG_NODE_SIZE = "N:node-size"
-	ARG_USER      = "U:user"
-	ARG_PASSWORD  = "P:password"
-	ARG_MAX_WAIT  = "w:max-wait"
+	OPT_TTL       = "t:ttl"
+	OPT_OUTPUT    = "o:output"
+	OPT_TOKEN     = "T:token"
+	OPT_KEY       = "K:key"
+	OPT_REGION    = "R:region"
+	OPT_NODE_SIZE = "N:node-size"
+	OPT_USER      = "U:user"
+	OPT_PASSWORD  = "P:password"
+	OPT_MAX_WAIT  = "w:max-wait"
 )
 
 // ////////////////////////////////////////////////////////////////////////////////// //
@@ -211,48 +211,48 @@ func applyPreferencesFromFile(prefs *Preferences, file string) error {
 
 // applyPreferencesFromArgs add values from command-line arguments to preferences struct
 func applyPreferencesFromArgs(prefs *Preferences) error {
-	if arg.Has(ARG_TTL) {
-		prefs.TTL = timeutil.ParseDuration(arg.GetS(ARG_TTL)) / 60
+	if options.Has(OPT_TTL) {
+		prefs.TTL = timeutil.ParseDuration(options.GetS(OPT_TTL)) / 60
 
 		if prefs.TTL == 0 {
 			return fmt.Errorf("Incorrect ttl property in command-line arguments")
 		}
 	}
 
-	if arg.Has(ARG_MAX_WAIT) {
-		prefs.MaxWait = timeutil.ParseDuration(arg.GetS(ARG_MAX_WAIT)) / 60
+	if options.Has(OPT_MAX_WAIT) {
+		prefs.MaxWait = timeutil.ParseDuration(options.GetS(OPT_MAX_WAIT)) / 60
 
 		if prefs.MaxWait == 0 {
 			return fmt.Errorf("Incorrect max-wait property in command-line arguments")
 		}
 	}
 
-	if arg.Has(ARG_OUTPUT) {
-		prefs.Output = arg.GetS(ARG_OUTPUT)
+	if options.Has(OPT_OUTPUT) {
+		prefs.Output = options.GetS(OPT_OUTPUT)
 	}
 
-	if arg.Has(ARG_TOKEN) {
-		prefs.Token = arg.GetS(ARG_TOKEN)
+	if options.Has(OPT_TOKEN) {
+		prefs.Token = options.GetS(OPT_TOKEN)
 	}
 
-	if arg.Has(ARG_KEY) {
-		prefs.Key = arg.GetS(ARG_KEY)
+	if options.Has(OPT_KEY) {
+		prefs.Key = options.GetS(OPT_KEY)
 	}
 
-	if arg.Has(ARG_REGION) {
-		prefs.Region = arg.GetS(ARG_REGION)
+	if options.Has(OPT_REGION) {
+		prefs.Region = options.GetS(OPT_REGION)
 	}
 
-	if arg.Has(ARG_NODE_SIZE) {
-		prefs.NodeSize = arg.GetS(ARG_NODE_SIZE)
+	if options.Has(OPT_NODE_SIZE) {
+		prefs.NodeSize = options.GetS(OPT_NODE_SIZE)
 	}
 
-	if arg.Has(ARG_USER) {
-		prefs.User = arg.GetS(ARG_USER)
+	if options.Has(OPT_USER) {
+		prefs.User = options.GetS(OPT_USER)
 	}
 
-	if arg.Has(ARG_PASSWORD) {
-		prefs.Password = arg.GetS(ARG_PASSWORD)
+	if options.Has(OPT_PASSWORD) {
+		prefs.Password = options.GetS(OPT_PASSWORD)
 	}
 
 	return nil
