@@ -18,23 +18,23 @@ import (
 	"strings"
 	"time"
 
-	"pkg.re/essentialkaos/ek.v8/arg"
-	"pkg.re/essentialkaos/ek.v8/env"
-	"pkg.re/essentialkaos/ek.v8/fmtc"
-	"pkg.re/essentialkaos/ek.v8/fmtutil"
-	"pkg.re/essentialkaos/ek.v8/fsutil"
-	"pkg.re/essentialkaos/ek.v8/jsonutil"
-	"pkg.re/essentialkaos/ek.v8/log"
-	"pkg.re/essentialkaos/ek.v8/mathutil"
-	"pkg.re/essentialkaos/ek.v8/path"
-	"pkg.re/essentialkaos/ek.v8/pluralize"
-	"pkg.re/essentialkaos/ek.v8/req"
-	"pkg.re/essentialkaos/ek.v8/spellcheck"
-	"pkg.re/essentialkaos/ek.v8/terminal"
-	"pkg.re/essentialkaos/ek.v8/timeutil"
-	"pkg.re/essentialkaos/ek.v8/tmp"
-	"pkg.re/essentialkaos/ek.v8/usage"
-	"pkg.re/essentialkaos/ek.v8/usage/update"
+	"pkg.re/essentialkaos/ek.v9/env"
+	"pkg.re/essentialkaos/ek.v9/fmtc"
+	"pkg.re/essentialkaos/ek.v9/fmtutil"
+	"pkg.re/essentialkaos/ek.v9/fsutil"
+	"pkg.re/essentialkaos/ek.v9/jsonutil"
+	"pkg.re/essentialkaos/ek.v9/log"
+	"pkg.re/essentialkaos/ek.v9/mathutil"
+	"pkg.re/essentialkaos/ek.v9/options"
+	"pkg.re/essentialkaos/ek.v9/path"
+	"pkg.re/essentialkaos/ek.v9/pluralize"
+	"pkg.re/essentialkaos/ek.v9/req"
+	"pkg.re/essentialkaos/ek.v9/spellcheck"
+	"pkg.re/essentialkaos/ek.v9/terminal"
+	"pkg.re/essentialkaos/ek.v9/timeutil"
+	"pkg.re/essentialkaos/ek.v9/tmp"
+	"pkg.re/essentialkaos/ek.v9/usage"
+	"pkg.re/essentialkaos/ek.v9/usage/update"
 
 	"github.com/essentialkaos/terrafarm/do"
 	"github.com/essentialkaos/terrafarm/prefs"
@@ -46,29 +46,29 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "1.1.0"
+	VER  = "1.2.0"
 	DESC = "Utility for working with terraform based RPMBuilder farm"
 )
 
 // List of supported command-line arguments
 const (
-	ARG_TTL         = "t:ttl"
-	ARG_OUTPUT      = "o:output"
-	ARG_TOKEN       = "T:token"
-	ARG_KEY         = "K:key"
-	ARG_REGION      = "R:region"
-	ARG_NODE_SIZE   = "N:node-size"
-	ARG_USER        = "U:user"
-	ARG_PASSWORD    = "P:password"
-	ARG_DEBUG       = "D:debug"
-	ARG_MONITOR     = "m:monitor"
-	ARG_MAX_WAIT    = "w:max-wait"
-	ARG_FORCE       = "f:force"
-	ARG_NO_VALIDATE = "nv:no-validate"
-	ARG_NOTIFY      = "n:notify"
-	ARG_NO_COLOR    = "nc:no-color"
-	ARG_HELP        = "h:help"
-	ARG_VER         = "v:version"
+	OPT_TTL         = "t:ttl"
+	OPT_OUTPUT      = "o:output"
+	OPT_TOKEN       = "T:token"
+	OPT_KEY         = "K:key"
+	OPT_REGION      = "R:region"
+	OPT_NODE_SIZE   = "N:node-size"
+	OPT_USER        = "U:user"
+	OPT_PASSWORD    = "P:password"
+	OPT_DEBUG       = "D:debug"
+	OPT_MONITOR     = "m:monitor"
+	OPT_MAX_WAIT    = "w:max-wait"
+	OPT_FORCE       = "f:force"
+	OPT_NO_VALIDATE = "nv:no-validate"
+	OPT_NOTIFY      = "n:notify"
+	OPT_NO_COLOR    = "nc:no-color"
+	OPT_HELP        = "h:help"
+	OPT_VER         = "v:version"
 )
 
 // List of supported commands
@@ -169,24 +169,24 @@ func (p NodeInfoSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
-// argMap is map with supported command-line arguments
-var argMap = arg.Map{
-	ARG_TTL:         {},
-	ARG_OUTPUT:      {},
-	ARG_TOKEN:       {},
-	ARG_KEY:         {},
-	ARG_REGION:      {},
-	ARG_NODE_SIZE:   {},
-	ARG_USER:        {},
-	ARG_MAX_WAIT:    {},
-	ARG_DEBUG:       {Type: arg.BOOL},
-	ARG_MONITOR:     {Type: arg.BOOL},
-	ARG_FORCE:       {Type: arg.BOOL},
-	ARG_NO_VALIDATE: {Type: arg.BOOL},
-	ARG_NOTIFY:      {Type: arg.BOOL},
-	ARG_NO_COLOR:    {Type: arg.BOOL},
-	ARG_HELP:        {Type: arg.BOOL, Alias: "u:usage"},
-	ARG_VER:         {Type: arg.BOOL, Alias: "ver"},
+// optMap is map with supported command-line options
+var optMap = options.Map{
+	OPT_TTL:         {},
+	OPT_OUTPUT:      {},
+	OPT_TOKEN:       {},
+	OPT_KEY:         {},
+	OPT_REGION:      {},
+	OPT_NODE_SIZE:   {},
+	OPT_USER:        {},
+	OPT_MAX_WAIT:    {},
+	OPT_DEBUG:       {Type: options.BOOL},
+	OPT_MONITOR:     {Type: options.BOOL},
+	OPT_FORCE:       {Type: options.BOOL},
+	OPT_NO_VALIDATE: {Type: options.BOOL},
+	OPT_NOTIFY:      {Type: options.BOOL},
+	OPT_NO_COLOR:    {Type: options.BOOL},
+	OPT_HELP:        {Type: options.BOOL, Alias: "u:usage"},
+	OPT_VER:         {Type: options.BOOL, Alias: "ver"},
 }
 
 // depList is slice with dependencies required by terrafarm
@@ -260,7 +260,7 @@ var temp *tmp.Temp
 func Init() {
 	runtime.GOMAXPROCS(2)
 
-	args, errs := arg.Parse(argMap)
+	args, errs := options.Parse(optMap)
 
 	if len(errs) != 0 {
 		for _, err := range errs {
@@ -270,21 +270,21 @@ func Init() {
 		exit(1)
 	}
 
-	if arg.GetB(ARG_NO_COLOR) {
+	if options.GetB(OPT_NO_COLOR) {
 		fmtc.DisableColors = true
 	}
 
-	if arg.GetB(ARG_VER) {
+	if options.GetB(OPT_VER) {
 		showAbout()
 		return
 	}
 
-	if arg.GetB(ARG_HELP) {
+	if options.GetB(OPT_HELP) {
 		showUsage()
 		return
 	}
 
-	if !arg.GetB(ARG_MONITOR) && len(args) == 0 {
+	if !options.GetB(OPT_MONITOR) && len(args) == 0 {
 		showUsage()
 		return
 	}
@@ -293,7 +293,7 @@ func Init() {
 	checkEnv()
 	checkDeps()
 
-	if arg.GetB(ARG_MONITOR) {
+	if options.GetB(OPT_MONITOR) {
 		startFarmMonitor()
 	} else {
 		processCommand(args[0], args[1:])
@@ -395,7 +395,7 @@ func createCommand(p *prefs.Preferences, args []string) {
 	validatePreferences(p)
 	statusCommand(p)
 
-	if !arg.GetB(ARG_FORCE) {
+	if !options.GetB(OPT_FORCE) {
 		yes, err := terminal.ReadAnswer("Create farm with this preferences?", "n")
 
 		if !yes || err != nil {
@@ -480,7 +480,7 @@ func createCommand(p *prefs.Preferences, args []string) {
 
 	saveState(p, farmStartTime)
 
-	if arg.GetB(ARG_NOTIFY) {
+	if options.GetB(OPT_NOTIFY) {
 		fmtc.Bell()
 	}
 }
@@ -516,7 +516,7 @@ func statusCommand(p *prefs.Preferences) {
 		monitorActive   = isMonitorActive()
 	)
 
-	disableValidation = arg.GetB(ARG_NO_VALIDATE)
+	disableValidation = options.GetB(OPT_NO_VALIDATE)
 
 	if terrafarmActive {
 		farmState, err = readFarmState()
@@ -684,7 +684,7 @@ func destroyCommand(prefs *prefs.Preferences) {
 
 	activeBuildNodesCount := getActiveBuildNodesCount(prefs)
 
-	if !arg.GetB(ARG_FORCE) {
+	if !options.GetB(OPT_FORCE) {
 		fmtc.NewLine()
 
 		if activeBuildNodesCount != 0 {
@@ -752,7 +752,7 @@ func destroyCommand(prefs *prefs.Preferences) {
 
 	deleteFarmStateFile()
 
-	if arg.GetB(ARG_NOTIFY) {
+	if options.GetB(OPT_NOTIFY) {
 		fmtc.Bell()
 	}
 }
@@ -1533,7 +1533,7 @@ func cleanTerraformGarbage() {
 
 // printDebug print debug message if debug mode enabled
 func printDebug(message string, args ...interface{}) {
-	if !arg.GetB(ARG_DEBUG) {
+	if !options.GetB(OPT_DEBUG) {
 		return
 	}
 
@@ -1546,7 +1546,7 @@ func printDebug(message string, args ...interface{}) {
 
 // exit exit from app with given code
 func exit(code int) {
-	if !arg.GetB(ARG_DEBUG) {
+	if !options.GetB(OPT_DEBUG) {
 		temp.Clean()
 	}
 
@@ -1569,21 +1569,21 @@ func showUsage() {
 	info.AddCommand(CMD_PROLONG, "Increase TTL or set max wait time", "ttl", "?max-wait")
 	info.AddCommand(CMD_DOCTOR, "Fix problems with farm")
 
-	info.AddOption(ARG_TTL, "Max farm TTL {s-}(Time To Live){!}", "time")
-	info.AddOption(ARG_MAX_WAIT, "Max time which monitor will wait if farm have active build", "time")
-	info.AddOption(ARG_OUTPUT, "Path to output file with access credentials", "file")
-	info.AddOption(ARG_TOKEN, "DigitalOcean token", "token")
-	info.AddOption(ARG_KEY, "Path to private key", "key-file")
-	info.AddOption(ARG_REGION, "DigitalOcean region", "region")
-	info.AddOption(ARG_NODE_SIZE, "Droplet size on DigitalOcean", "size")
-	info.AddOption(ARG_USER, "Build node user name", "username")
-	info.AddOption(ARG_PASSWORD, "Build node user password", "password")
-	info.AddOption(ARG_FORCE, "Force command execution")
-	info.AddOption(ARG_NO_VALIDATE, "Don't validate preferences")
-	info.AddOption(ARG_NOTIFY, "Ring the system bell after finishing command execution")
-	info.AddOption(ARG_NO_COLOR, "Disable colors in output")
-	info.AddOption(ARG_HELP, "Show this help message")
-	info.AddOption(ARG_VER, "Show version")
+	info.AddOption(OPT_TTL, "Max farm TTL {s-}(Time To Live){!}", "time")
+	info.AddOption(OPT_MAX_WAIT, "Max time which monitor will wait if farm have active build", "time")
+	info.AddOption(OPT_OUTPUT, "Path to output file with access credentials", "file")
+	info.AddOption(OPT_TOKEN, "DigitalOcean token", "token")
+	info.AddOption(OPT_KEY, "Path to private key", "key-file")
+	info.AddOption(OPT_REGION, "DigitalOcean region", "region")
+	info.AddOption(OPT_NODE_SIZE, "Droplet size on DigitalOcean", "size")
+	info.AddOption(OPT_USER, "Build node user name", "username")
+	info.AddOption(OPT_PASSWORD, "Build node user password", "password")
+	info.AddOption(OPT_FORCE, "Force command execution")
+	info.AddOption(OPT_NO_VALIDATE, "Don't validate preferences")
+	info.AddOption(OPT_NOTIFY, "Ring the system bell after finishing command execution")
+	info.AddOption(OPT_NO_COLOR, "Disable colors in output")
+	info.AddOption(OPT_HELP, "Show this help message")
+	info.AddOption(OPT_VER, "Show version")
 
 	info.AddExample(CMD_CREATE+" --node-size 8gb --ttl 3h", "Create farm with redefined node size and TTL")
 	info.AddExample(CMD_CREATE+" --force", "Forced farm creation (without prompt)")
