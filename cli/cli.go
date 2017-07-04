@@ -270,9 +270,7 @@ func Init() {
 		exit(1)
 	}
 
-	if options.GetB(OPT_NO_COLOR) {
-		fmtc.DisableColors = true
-	}
+	configureUI()
 
 	if options.GetB(OPT_VER) {
 		showAbout()
@@ -298,6 +296,17 @@ func Init() {
 	} else {
 		processCommand(args[0], args[1:])
 	}
+}
+
+// configureUI configure UI
+func configureUI() {
+	if options.GetB(OPT_NO_COLOR) {
+		fmtc.DisableColors = true
+	}
+
+	terminal.Prompt = "› "
+	fmtutil.SeparatorFullscreen = true
+	fmtutil.SeparatorSymbol = "–"
 }
 
 // prepare configure resources
@@ -1559,7 +1568,7 @@ func exit(code int) {
 
 // showUsage show help content
 func showUsage() {
-	info := usage.NewInfo("")
+	info := usage.NewInfo()
 
 	info.AddCommand(CMD_CREATE, "Create and run farm droplets on DigitalOcean", "?template-name")
 	info.AddCommand(CMD_DESTROY, "Destroy farm droplets on DigitalOcean")
