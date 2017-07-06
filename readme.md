@@ -8,7 +8,7 @@
 
 ### Usage demo
 
-[![demo](https://gh.kaos.io/terrafarm-0101.gif)](#usage-demo)
+[![demo](https://gh.kaos.io/terrafarm-130.gif)](#usage-demo)
 
 ### Installation
 
