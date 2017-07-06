@@ -22,7 +22,7 @@ resource "digitalocean_droplet" "builder-c7-x64" {
       "echo 'Updating system packages...'",
       "yum -y -q update",
       "echo 'Installing KAOS repository package...'",
-      "yum -y -q install https://yum.kaos.io/7/release/x86_64/kaos-repo-7.2-0.el7.noarch.rpm",
+      "yum -y -q install https://yum.kaos.io/7/release/x86_64/kaos-repo-8.0-0.el7.noarch.rpm",
       "echo 'Updating packages...'",
       "yum -y -q update",
       "echo 'Installing RPMBuilder Node package...'",
