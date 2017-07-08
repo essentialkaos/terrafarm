@@ -255,6 +255,9 @@ var colorTags = []string{
 // temp is temp struct
 var temp *tmp.Temp
 
+// Index of current tmux pane
+var curTmuxPane string
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 func Init() {
@@ -300,13 +303,36 @@ func Init() {
 
 // configureUI configure UI
 func configureUI() {
+	ev := env.Get()
+	term := ev.GetS("TERM")
+
+	if term != "" {
+		switch {
+		case strings.Contains(term, "xterm"),
+			strings.Contains(term, "color"),
+			term == "screen":
+			fmtc.DisableColors = false
+		}
+	}
+
+	if ev.GetS("TMUX") != "" {
+		curTmuxPane = ev.GetS("TMUX_PANE")
+	}
+
 	if options.GetB(OPT_NO_COLOR) {
 		fmtc.DisableColors = true
 	}
 
-	terminal.Prompt = "› "
+	if !fsutil.IsCharacterDevice("/dev/stdout") && ev.GetS("FAKETTY") == "" {
+		fmtc.DisableColors = true
+	}
+
+	if fmtc.DisableColors {
+		terminal.Prompt = "› "
+		fmtutil.SeparatorSymbol = "–"
+	}
+
 	fmtutil.SeparatorFullscreen = true
-	fmtutil.SeparatorSymbol = "–"
 }
 
 // prepare configure resources
@@ -489,9 +515,7 @@ func createCommand(p *prefs.Preferences, args []string) {
 
 	saveState(p, farmStartTime)
 
-	if options.GetB(OPT_NOTIFY) {
-		fmtc.Bell()
-	}
+	notify()
 }
 
 // statusCommand is status command handler
@@ -761,9 +785,7 @@ func destroyCommand(prefs *prefs.Preferences) {
 
 	deleteFarmStateFile()
 
-	if options.GetB(OPT_NOTIFY) {
-		fmtc.Bell()
-	}
+	notify()
 }
 
 // templatesCommand is templates command handler
@@ -1537,6 +1559,21 @@ func cleanTerraformGarbage() {
 
 	for _, file := range garbage {
 		os.Remove(file)
+	}
+}
+
+// notify print a bell symbol
+func notify() {
+	if options.GetB(OPT_NOTIFY) {
+		fmtc.Bell()
+	}
+
+	if curTmuxPane != "" {
+		ev := env.Get()
+
+		if ev.GetS("TMUX_PANE") != curTmuxPane {
+			fmtc.Bell()
+		}
 	}
 }
 
