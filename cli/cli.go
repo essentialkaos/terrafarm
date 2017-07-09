@@ -312,10 +312,6 @@ func configureUI() {
 		}
 	}
 
-	if ev.GetS("TMUX") != "" {
-		curTmuxPane = ev.GetS("TMUX_PANE")
-	}
-
 	if options.GetB(OPT_NO_COLOR) {
 		fmtc.DisableColors = true
 	}
