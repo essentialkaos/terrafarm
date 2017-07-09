@@ -255,9 +255,6 @@ var colorTags = []string{
 // temp is temp struct
 var temp *tmp.Temp
 
-// Index of current tmux pane
-var curTmuxPane string
-
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 func Init() {
@@ -1566,14 +1563,6 @@ func cleanTerraformGarbage() {
 func notify() {
 	if options.GetB(OPT_NOTIFY) {
 		fmtc.Bell()
-	}
-
-	if curTmuxPane != "" {
-		ev := env.Get()
-
-		if ev.GetS("TMUX_PANE") != curTmuxPane {
-			fmtc.Bell()
-		}
 	}
 }
 
