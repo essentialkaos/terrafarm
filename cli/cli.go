@@ -255,6 +255,9 @@ var colorTags = []string{
 // temp is temp struct
 var temp *tmp.Temp
 
+// curTmuxWindowIndex is index of tmux window
+var curTmuxWindowIndex string
+
 // ////////////////////////////////////////////////////////////////////////////////// //
 
 func Init() {
@@ -310,6 +313,10 @@ func configureUI() {
 			term == "screen":
 			fmtc.DisableColors = false
 		}
+	}
+
+	if ev.GetS("TMUX") != "" {
+		curTmuxWindowIndex = getCurrentTmuxWindowIndex()
 	}
 
 	if options.GetB(OPT_NO_COLOR) {
@@ -1560,6 +1567,25 @@ func notify() {
 	if options.GetB(OPT_NOTIFY) {
 		fmtc.Bell()
 	}
+
+	if curTmuxWindowIndex != "" {
+		windowIndex := getCurrentTmuxWindowIndex()
+
+		if windowIndex != curTmuxWindowIndex {
+			fmtc.Bell()
+		}
+	}
+}
+
+// getCurrentTmuxWindowIndex return current window index in tmux
+func getCurrentTmuxWindowIndex() string {
+	output, err := exec.Command("tmux", "display-message", "-p", "#I").Output()
+
+	if err != nil {
+		return ""
+	}
+
+	return string(output[:])
 }
 
 // printDebug print debug message if debug mode enabled
