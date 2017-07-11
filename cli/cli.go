@@ -204,6 +204,7 @@ var startTime = time.Now().Unix()
 var droplets = []string{
 	"512mb", "1gb", "2gb", "4gb", "8gb", "16gb", "32gb", "64gb",
 	"m-16gb", "m-32gb", "m-64gb", "m-128gb", "m-224gb",
+	"c-2", "c-4", "c-8", "c-16", "c-32",
 }
 
 // dropletInfoStorage contains info about droplets
@@ -222,6 +223,11 @@ var dropletInfoStorage = map[string]DropletInfo{
 	"m-64gb":  {0.714, 8, 64, 200},
 	"m-128gb": {1.429, 16, 128, 340},
 	"m-224gb": {2.500, 32, 224, 500},
+	"c-2":     {0.060, 2, 3, 20},
+	"c-4":     {0.119, 4, 6, 20},
+	"c-8":     {0.238, 8, 12, 20},
+	"c-16":    {0.476, 16, 24, 20},
+	"c-32":    {0.952, 32, 48, 20},
 }
 
 // regions contains regions codes
