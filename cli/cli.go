@@ -29,6 +29,7 @@ import (
 	"pkg.re/essentialkaos/ek.v9/path"
 	"pkg.re/essentialkaos/ek.v9/pluralize"
 	"pkg.re/essentialkaos/ek.v9/req"
+	"pkg.re/essentialkaos/ek.v9/sliceutil"
 	"pkg.re/essentialkaos/ek.v9/spellcheck"
 	"pkg.re/essentialkaos/ek.v9/terminal"
 	"pkg.re/essentialkaos/ek.v9/timeutil"
@@ -147,10 +148,11 @@ type NodeInfo struct {
 
 // DropletInfo contains basic node info
 type DropletInfo struct {
-	Price  float64
-	CPU    int
-	Memory float64
-	Disk   int
+	Price   float64
+	CPU     int
+	Memory  float64
+	Disk    int
+	Regions []string
 }
 
 type RegionInfo struct {
@@ -209,25 +211,25 @@ var droplets = []string{
 
 // dropletInfoStorage contains info about droplets
 var dropletInfoStorage = map[string]DropletInfo{
-	"512mb":   {0.007, 1, 0.512, 20},
-	"1gb":     {0.015, 1, 1, 30},
-	"2gb":     {0.030, 2, 2, 40},
-	"4gb":     {0.060, 2, 4, 60},
-	"8gb":     {0.119, 4, 8, 80},
-	"16gb":    {0.238, 8, 16, 160},
-	"32gb":    {0.426, 12, 32, 320},
-	"48gb":    {0.714, 16, 48, 480},
-	"64gb":    {0.952, 20, 64, 640},
-	"m-16gb":  {0.179, 2, 16, 30},
-	"m-32gb":  {0.357, 4, 32, 90},
-	"m-64gb":  {0.714, 8, 64, 200},
-	"m-128gb": {1.429, 16, 128, 340},
-	"m-224gb": {2.500, 32, 224, 500},
-	"c-2":     {0.060, 2, 3, 20},
-	"c-4":     {0.119, 4, 6, 20},
-	"c-8":     {0.238, 8, 12, 20},
-	"c-16":    {0.476, 16, 24, 20},
-	"c-32":    {0.952, 32, 48, 20},
+	"512mb":   {0.007, 1, 0.512, 20, nil},
+	"1gb":     {0.015, 1, 1, 30, nil},
+	"2gb":     {0.030, 2, 2, 40, nil},
+	"4gb":     {0.060, 2, 4, 60, nil},
+	"8gb":     {0.119, 4, 8, 80, nil},
+	"16gb":    {0.238, 8, 16, 160, nil},
+	"32gb":    {0.426, 12, 32, 320, nil},
+	"48gb":    {0.714, 16, 48, 480, nil},
+	"64gb":    {0.952, 20, 64, 640, nil},
+	"m-16gb":  {0.179, 2, 16, 30, []string{"nyc1", "nyc3", "sfo2", "lon1", "fra1", "tor1", "blr1"}},
+	"m-32gb":  {0.357, 4, 32, 90, []string{"nyc1", "nyc3", "sfo2", "lon1", "fra1", "tor1", "blr1"}},
+	"m-64gb":  {0.714, 8, 64, 200, []string{"nyc1", "nyc3", "sfo2", "lon1", "fra1", "tor1", "blr1"}},
+	"m-128gb": {1.429, 16, 128, 340, []string{"nyc1", "nyc3", "sfo2", "lon1", "fra1", "tor1", "blr1"}},
+	"m-224gb": {2.500, 32, 224, 500, []string{"nyc1", "nyc3", "sfo2", "lon1", "fra1", "tor1", "blr1"}},
+	"c-2":     {0.060, 2, 3, 20, []string{"nyc1", "nyc3", "sfo2", "ams3", "tor1", "blr1"}},
+	"c-4":     {0.119, 4, 6, 20, []string{"nyc1", "nyc3", "sfo2", "ams3", "tor1", "blr1"}},
+	"c-8":     {0.238, 8, 12, 20, []string{"nyc1", "nyc3", "sfo2", "ams3", "tor1", "blr1"}},
+	"c-16":    {0.476, 16, 24, 20, []string{"nyc1", "nyc3", "sfo2", "ams3", "tor1", "blr1"}},
+	"c-32":    {0.952, 32, 48, 20, []string{"nyc1", "nyc3", "sfo2", "ams3", "tor1", "blr1"}},
 }
 
 // regions contains regions codes
@@ -598,6 +600,10 @@ func statusCommand(p *prefs.Preferences) {
 		if p.Template != "" {
 			regionValid = do.IsRegionValid(p.Token, p.Region)
 			sizeValid = do.IsSizeValid(p.Token, p.NodeSize)
+		}
+
+		if !isDropletAvailable(p.NodeSize, p.Region) {
+			sizeValid = do.STATUS_NOT_OK
 		}
 	}
 
@@ -1533,6 +1539,21 @@ func exportNodeList(p *prefs.Preferences) error {
 	}
 
 	return nil
+}
+
+// isDropletAvailable check availability of droplet in given region
+func isDropletAvailable(name, region string) bool {
+	info := dropletInfoStorage[name]
+
+	if info.Price == 0 {
+		return false
+	}
+
+	if info.Regions == nil {
+		return true
+	}
+
+	return sliceutil.Contains(info.Regions, region)
 }
 
 // getSpellcheckModel return spellcheck model for correcting
