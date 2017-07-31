@@ -1,16 +1,18 @@
-<p align="center"><a href="#usage-demo">Usage demo</a> • <a href="#installation">Installation</a> • <a href="#configuration">Configuration</a> • <a href="#debugging">Debugging</a> • <a href="#usage">Usage</a> • <a href="#build-status">Build Status</a> • <a href="#contributing">Contributing</a> • <a href="#license">License</a></p>
-
+<p align="center"><img width="200" height="200" src="https://gh.kaos.io/terrafarm.png"/></p>
 <p align="center">
-<img width="200" height="200" src="https://gh.kaos.io/terrafarm.png"/>
+<a href="https://travis-ci.org/essentialkaos/terrafarm"><img src="https://travis-ci.org/essentialkaos/terrafarm.svg?branch=master" /></a>
+<a href="https://goreportcard.com/report/github.com/essentialkaos/terrafarm"><img src="https://goreportcard.com/badge/github.com/essentialkaos/terrafarm" /></a>
+<a href="https://essentialkaos.com/ekol"><img src="https://gh.kaos.io/ekol.svg" /></a>
 </p>
+<p align="center"><a href="#usage-demo">Usage demo</a> • <a href="#installation">Installation</a> • <a href="#configuration">Configuration</a> • <a href="#debugging">Debugging</a> • <a href="#usage">Usage</a> • <a href="#build-status">Build Status</a> • <a href="#contributing">Contributing</a> • <a href="#license">License</a></p>
 
 `terrafarm` is a utility for working with [Terraform](https://www.terraform.io)-based [rpmbuilder](https://github.com/essentialkaos/rpmbuilder) farm on [DigitalOcean](https://www.digitalocean.com).
 
-## Usage demo
+### Usage demo
 
-[![demo](https://gh.kaos.io/terrafarm-0101.gif)](#usage-demo)
+[![demo](https://gh.kaos.io/terrafarm-130.gif)](#usage-demo)
 
-## Installation
+### Installation
 
 Before the initial install allows git to use redirects for [pkg.re](https://github.com/essentialkaos/pkgre) service (reason why you should do this described [here](https://github.com/essentialkaos/pkgre#git-support)):
 
@@ -30,7 +32,7 @@ If you want update terrafarm to latest stable release, do:
 go get -u github.com/essentialkaos/terrafarm
 ```
 
-## Configuration
+### Configuration
 
 `terrafarm` have three ways for farm configuration — preferences file, environment variables, and command-line arguments.
 
@@ -40,7 +42,7 @@ You can use all three ways simultaneously, but in this case, `terrafarm` uses di
 2. Environment variables
 3. Command-line arguments (_highest priority_)
 
-### Preferences file
+#### Preferences file
 
 Preferences file use next format:
 
@@ -62,7 +64,7 @@ ttl: 2h
 
 Preferences file must be named as `.terrafarm` and placed in your `HOME` directory.
 
-### Environment variables
+#### Environment variables
 
 _Environment variables overwrite properties defined in preferences file._
 
@@ -86,13 +88,13 @@ Example:
 TERRAFARM_DATA=/home/user/my-own-terraform-data TERRAFARM_TTL=1h terrafarm create
 ```
 
-### Command-line arguments
+#### Command-line arguments
 
 _Command-line arguments overwrite properties defined in preferences file and environment variables._
 
 All supported command-line arguments with usage examples can be found in [usage](#usage) section.
 
-## Debugging
+### Debugging
 
 If you find a bug with Terrafarm, please include the detailed log. As a user, this information can help work around the problem and prepare fixes. 
 
@@ -100,7 +102,7 @@ First of all, you should specify `-D` or `--debug` argument with Terrafarm to pr
 
 Also, keep in mind that Terrafarm works with Terraform and you should know how to debug it. We recommend using `DEBUG` or `TRACE` values to find possible problems with Terraform. This will cause detailed logs to appear on stderr. To persist logged output you can set `TF_LOG_PATH` to write the log to a specific file.
 
-## Usage
+### Usage
 
 ```
 Usage: terrafarm {command} {options}
@@ -155,17 +157,19 @@ Examples
 
 ```
 
-## Build Status
+### Build Status
 
-| Repository | Status |
-|------------|--------|
-| Stable | [![Build Status](https://travis-ci.org/essentialkaos/terrafarm.svg?branch=master)](https://travis-ci.org/essentialkaos/terrafarm) |
-| Unstable | [![Build Status](https://travis-ci.org/essentialkaos/terrafarm.svg?branch=develop)](https://travis-ci.org/essentialkaos/terrafarm) |
+| Branch | Status |
+|--------|--------|
+| `master` | [![Build Status](https://travis-ci.org/essentialkaos/terrafarm.svg?branch=master)](https://travis-ci.org/essentialkaos/terrafarm) |
+| `develop` | [![Build Status](https://travis-ci.org/essentialkaos/terrafarm.svg?branch=develop)](https://travis-ci.org/essentialkaos/terrafarm) |
 
-## Contributing
+### Contributing
 
 Before contributing to this project please read our [Contributing Guidelines](https://github.com/essentialkaos/contributing-guidelines#contributing-guidelines).
 
-## License
+### License
 
 [EKOL](https://essentialkaos.com/ekol)
+
+<p align="center"><a href="https://essentialkaos.com"><img src="https://gh.kaos.io/ekgh.svg"/></a></p>

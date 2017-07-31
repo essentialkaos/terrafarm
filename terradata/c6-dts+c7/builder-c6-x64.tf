@@ -22,7 +22,7 @@ resource "digitalocean_droplet" "builder-c6-x64" {
       "echo 'Updating system packages...'",
       "yum -y -q update",
       "echo 'Installing KAOS repository package...'",
-      "yum -y -q install https://yum.kaos.io/6/release/x86_64/kaos-repo-7.2-0.el6.noarch.rpm",
+      "yum -y -q install https://yum.kaos.io/6/release/x86_64/kaos-repo-8.0-0.el6.noarch.rpm",
       "echo 'Installing DevToolSet repo...'",
       "rpm --import https://linux.web.cern.ch/linux/scientific6/docs/repository/cern/slc6X/i386/RPM-GPG-KEY-cern",
       "curl -ss -o /etc/yum.repos.d/slc6-devtoolset.repo https://linux.web.cern.ch/linux/scientific6/docs/repository/cern/devtoolset/slc6-devtoolset.repo",

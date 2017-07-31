@@ -416,7 +416,7 @@ func (p *Preferences) GetVariablesData() (string, error) {
 		return "", err
 	}
 
-	fingerpint, err := getFingerprint(p.Key + ".pub")
+	fingerprint, err := getFingerprint(p.Key + ".pub")
 
 	if err != nil {
 		return "", err
@@ -424,7 +424,7 @@ func (p *Preferences) GetVariablesData() (string, error) {
 
 	result += fmt.Sprintf("%s = \"%s\"\n", "token", p.Token)
 	result += fmt.Sprintf("%s = \"%s\"\n", "auth", auth)
-	result += fmt.Sprintf("%s = \"%s\"\n", "fingerprint", fingerpint)
+	result += fmt.Sprintf("%s = \"%s\"\n", "fingerprint", fingerprint)
 	result += fmt.Sprintf("%s = \"%s\"\n", "key", p.Key)
 	result += fmt.Sprintf("%s = \"%s\"\n", "user", p.User)
 	result += fmt.Sprintf("%s = \"%s\"\n", "password", p.Password)
