@@ -13,24 +13,29 @@ import (
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
+// TFState contains terraform state
 type TFState struct {
 	Modules []*TFModule `json:"modules"`
 }
 
+// TFModule is terraform module
 type TFModule struct {
 	Resources map[string]*TFResource `json:"resources"`
 }
 
+// TFResource is  terraform resource
 type TFResource struct {
 	Type string          `json:"type"`
 	Info *TFResourceInfo `json:"primary"`
 }
 
+// TFResourceInfo contains info about terraform resource
 type TFResourceInfo struct {
 	ID         string                `json:"id"`
 	Attributes *TFResourceAttributes `json:"attributes"`
 }
 
+// TFResourceAttributes contains terraform resource attributes
 type TFResourceAttributes struct {
 	ID     string `json:"id"`
 	IP     string `json:"ipv4_address"`
