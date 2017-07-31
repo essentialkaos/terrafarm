@@ -104,7 +104,7 @@ const (
 	STATE_DOWN
 )
 
-// Environment variable with path to data
+// EV_DATA is environment variable with path to data
 const EV_DATA = "TERRAFARM_DATA"
 
 // TERRAFORM_DATA_DIR is name of directory with terraform data
@@ -155,6 +155,7 @@ type DropletInfo struct {
 	Regions []string
 }
 
+// RegionInfo contains basic region info
 type RegionInfo struct {
 	DCName     string
 	RegionName string
@@ -268,6 +269,7 @@ var curTmuxWindowIndex string
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
+// Init is main func
 func Init() {
 	runtime.GOMAXPROCS(2)
 

@@ -29,44 +29,55 @@ const DO_API = "https://api.digitalocean.com/v2"
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
+// StatusCode status code
 type StatusCode uint8
 
+// Account contains account status
 type Account struct {
 	Status string `json:"status"`
 }
 
+// AccountInfo contains account info
 type AccountInfo struct {
 	Account *Account `json:"account"`
 }
 
+// KeysInfo contains info about used keys
 type KeysInfo struct {
 	Keys []*Key `json:"ssh_keys"`
 }
 
+// Key contains key fingerprint
 type Key struct {
 	Fingerprint string `json:"fingerprint"`
 }
 
+// RegionsInfo contains info about supported regions
 type RegionsInfo struct {
 	Regions []*Region `json:"regions"`
 }
 
+// Region contains region slug
 type Region struct {
 	Slug string `json:"slug"`
 }
 
+// SizesInfo contains info about supported droplet sizes
 type SizesInfo struct {
 	Sizes []*Region `json:"sizes"`
 }
 
+// Size contains droplet size slug
 type Size struct {
 	Slug string `json:"slug"`
 }
 
+// DropletsInfo contains info about droplets
 type DropletsInfo struct {
 	Droplets []*Droplet `json:"droplets"`
 }
 
+// Droplet contains droplet ID and name
 type Droplet struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`

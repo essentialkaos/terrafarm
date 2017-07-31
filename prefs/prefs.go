@@ -331,6 +331,7 @@ func getFingerprint(key string) (string, error) {
 
 // ////////////////////////////////////////////////////////////////////////////////// //
 
+// Validate validate preferences
 func (p *Preferences) Validate(dataDir string, allowEmptyTemplate bool) []error {
 	var errs []error
 
@@ -407,6 +408,7 @@ func (p *Preferences) Validate(dataDir string, allowEmptyTemplate bool) []error 
 	return errs
 }
 
+// GetVariablesData return encoded preferencies
 func (p *Preferences) GetVariablesData() (string, error) {
 	var result string
 
