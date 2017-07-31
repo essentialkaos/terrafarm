@@ -1,10 +1,10 @@
-<p align="center"><a href="#usage-demo">Usage demo</a> • <a href="#installation">Installation</a> • <a href="#configuration">Configuration</a> • <a href="#debugging">Debugging</a> • <a href="#usage">Usage</a> • <a href="#build-status">Build Status</a> • <a href="#contributing">Contributing</a> • <a href="#license">License</a></p>
 <p align="center"><img width="200" height="200" src="https://gh.kaos.io/terrafarm.png"/></p>
 <p align="center">
 <a href="https://travis-ci.org/essentialkaos/terrafarm"><img src="https://travis-ci.org/essentialkaos/terrafarm.svg?branch=master" /></a>
 <a href="https://goreportcard.com/report/github.com/essentialkaos/terrafarm"><img src="https://goreportcard.com/badge/github.com/essentialkaos/terrafarm" /></a>
 <a href="https://essentialkaos.com/ekol"><img src="https://gh.kaos.io/ekol.svg" /></a>
 </p>
+<p align="center"><a href="#usage-demo">Usage demo</a> • <a href="#installation">Installation</a> • <a href="#configuration">Configuration</a> • <a href="#debugging">Debugging</a> • <a href="#usage">Usage</a> • <a href="#build-status">Build Status</a> • <a href="#contributing">Contributing</a> • <a href="#license">License</a></p>
 
 `terrafarm` is a utility for working with [Terraform](https://www.terraform.io)-based [rpmbuilder](https://github.com/essentialkaos/rpmbuilder) farm on [DigitalOcean](https://www.digitalocean.com).
 
