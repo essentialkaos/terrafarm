@@ -47,7 +47,7 @@ import (
 // App info
 const (
 	APP  = "Terrafarm"
-	VER  = "1.3.0"
+	VER  = "1.3.1"
 	DESC = "Utility for working with terraform based RPMBuilder farm"
 )
 
@@ -471,6 +471,7 @@ func createCommand(p *prefs.Preferences, args []string) {
 
 	if err != nil {
 		terminal.PrintErrorMessage("\nError while executing terraform: %v", err)
+		notify()
 		exit(1)
 	}
 
@@ -507,6 +508,7 @@ func createCommand(p *prefs.Preferences, args []string) {
 		if err != nil {
 			fmtc.NewLine()
 			terminal.PrintErrorMessage("Error while saving monitoring process state: %v", err)
+			notify()
 			exit(1)
 		}
 
@@ -515,6 +517,7 @@ func createCommand(p *prefs.Preferences, args []string) {
 		if err != nil {
 			fmtc.NewLine()
 			terminal.PrintErrorMessage("Error while starting monitoring process: %v", err)
+			notify()
 			exit(1)
 		}
 
@@ -788,6 +791,7 @@ func destroyCommand(prefs *prefs.Preferences) {
 
 	if err != nil {
 		terminal.PrintErrorMessage("\nError while executing terraform: %v", err)
+		notify()
 		exit(1)
 	}
 
