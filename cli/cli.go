@@ -1599,6 +1599,7 @@ func cleanTerraformGarbage() {
 func notify() {
 	if options.GetB(OPT_NOTIFY) {
 		fmtc.Bell()
+		return
 	}
 
 	if curTmuxWindowIndex != "" {
