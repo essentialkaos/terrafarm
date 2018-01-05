@@ -179,7 +179,7 @@ var optMap = options.Map{
 	OPT_TOKEN:       {},
 	OPT_KEY:         {},
 	OPT_REGION:      {},
-	OPT_NODE_SIZE:   {},
+	OPT_SIZE:        {},
 	OPT_USER:        {},
 	OPT_MAX_WAIT:    {},
 	OPT_DEBUG:       {Type: options.BOOL},
